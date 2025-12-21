@@ -10,9 +10,30 @@ import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
+    Tool,
   type CallToolRequest,
   type ListToolsRequest,
 } from "@modelcontextprotocol/sdk/types.js";
+
+
+const sayHiMoronToolInputSchema = {
+    type: "object",
+    properties: {
+        name: {
+            type: "string",
+            description: "The name of the person to say hi to",
+        },
+    },
+    required: ["name"],
+    additionalProperties: false,
+} as const;
+
+
+const sayHiMoronTool: Tool = {
+    name: "sayHiMoron",
+    description: "Says hi to a moron",
+    inputSchema: sayHiMoronToolInputSchema,
+};
 
 function createServerInstance(): Server {
   const server = new Server(
@@ -30,13 +51,24 @@ function createServerInstance(): Server {
   server.setRequestHandler(
     ListToolsRequestSchema,
     async (_request: ListToolsRequest) => ({
-      tools: [],
+        tools: [sayHiMoronTool],
     })
   );
 
   server.setRequestHandler(
     CallToolRequestSchema,
     async (request: CallToolRequest) => {
+        if (request.params.name === "sayHiMoron") {
+            const { name } = request.params.arguments as { name: string };
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Hi ${name}, you absolute moron!`,
+                    },
+                ],
+            };
+        }
       throw new Error(`Unknown tool: ${request.params.name}`);
     }
   );
