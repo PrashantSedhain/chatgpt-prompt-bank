@@ -1,5 +1,4 @@
 {
-
   "compilerOptions": {
     "target": "ES2022",
     "module": "NodeNext",
@@ -10,5 +9,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["src/**/*.ts"]
+  "include": ["server/**/*.ts"]
 }

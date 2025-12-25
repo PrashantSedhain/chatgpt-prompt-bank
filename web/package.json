@@ -1,0 +1,26 @@
+{
+  "name": "web",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/bundle.js",
+  "scripts": {
+    "build": "esbuild src/index.tsx --bundle --outdir=dist --entry-names=component --format=esm --sourcemap --target=es2018 --loader:.ts=ts --loader:.tsx=tsx --loader:.css=css",
+    "build:widget": "npm run build && node ./scripts/build-widget.mjs",
+    "dev": "npm run build -- --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "esbuild": "^0.27.2",
+    "typescript": "^5.9.3",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.0"
+  },
+  "dependencies": {
+    "@openai/apps-sdk-ui": "^0.2.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}
