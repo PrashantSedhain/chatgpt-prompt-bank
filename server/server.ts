@@ -586,6 +586,31 @@ const fetchPromptSchema: Tool["inputSchema"] = {
     additionalProperties: false,
 };
 
+const promptInsightsSchema: Tool["inputSchema"] = {
+    type: "object",
+    properties: {
+        countLimit: {
+            type: "integer",
+            minimum: 100,
+            maximum: 20000,
+            description: "Optional cap for counting vectors (default 2000).",
+        },
+        sampleLimit: {
+            type: "integer",
+            minimum: 20,
+            maximum: 1000,
+            description: "Optional metadata sample size for tag/time insights (default 200).",
+        },
+        question: {
+            type: "string",
+            description:
+                "Optional: the user's question (e.g. 'how many prompts do I have?' or 'what tags do I use most?').",
+        },
+    },
+    required: [],
+    additionalProperties: false,
+};
+
 const savePromptSchema: Tool["inputSchema"] = {
     type: "object",
     properties: {
@@ -684,9 +709,10 @@ const oauthSecuritySchemes: NonNullable<Tool["securitySchemes"]> = [
 const tools: Tool[] = [
     {
         name: promptWidget.id,
-        description: promptWidget.title,
+        description:
+            "Search the user's saved prompts and return the most similar prompts. Use `promptInsights` for counts/statistics.",
         inputSchema: fetchPromptSchema,
-        title: promptWidget.title,
+        title: "Find saved prompts",
         _meta: {
             ...widgetDescriptorMeta(promptWidget),
             securitySchemes: oauthSecuritySchemes,
@@ -732,6 +758,19 @@ const tools: Tool[] = [
             destructiveHint: false,
             openWorldHint: false,
             readOnlyHint: false,
+        },
+        securitySchemes: oauthSecuritySchemes,
+    },
+    {
+        name: "promptInsights",
+        title: "PromptBank summary (count & tags)",
+        description:
+            "Use this for account-level questions about the user's PromptBank: how many prompts they have saved, top tags, and first/last saved times. Do NOT call `fetchPrompt` to answer counting/statistics questions.",
+        inputSchema: promptInsightsSchema,
+        annotations: {
+            destructiveHint: false,
+            openWorldHint: false,
+            readOnlyHint: true,
         },
         securitySchemes: oauthSecuritySchemes,
     },
@@ -821,7 +860,8 @@ function createServerInstance(authContext: AuthContext): Server {
                 normalizedToolName === "fetchPrompt" ||
                 normalizedToolName === "savePrompt" ||
                 normalizedToolName === "deletePrompt" ||
-                normalizedToolName === "updatePrompt";
+                normalizedToolName === "updatePrompt" ||
+                normalizedToolName === "promptInsights";
 
             if (!authContext.authorized && requiresAuth) {
                 const error =
@@ -1003,7 +1043,7 @@ function createServerInstance(authContext: AuthContext): Server {
                 }
             }
 
-            if (normalizedToolName === "updatePrompt") {
+	            if (normalizedToolName === "updatePrompt") {
                 const userSub = authContext.subject!;
                 const key = typeof _request.params.arguments?.key === "string" ? _request.params.arguments.key : "";
                 const text = typeof _request.params.arguments?.text === "string" ? _request.params.arguments.text : "";
@@ -1038,12 +1078,49 @@ function createServerInstance(authContext: AuthContext): Server {
                         content: [{ type: "text", text: "Failed to update prompt." }],
                     } as any;
                 }
-            }
+	            }
+	
+	            if (normalizedToolName === "promptInsights") {
+	                const userSub = authContext.subject!;
+	                try {
+	                    const countLimit =
+	                        typeof _request.params.arguments?.countLimit === "number" && Number.isFinite(_request.params.arguments.countLimit)
+	                            ? Math.max(100, Math.min(20000, Math.floor(_request.params.arguments.countLimit)))
+	                            : 2000;
+	                    const sampleLimit =
+	                        typeof _request.params.arguments?.sampleLimit === "number" && Number.isFinite(_request.params.arguments.sampleLimit)
+	                            ? Math.max(20, Math.min(1000, Math.floor(_request.params.arguments.sampleLimit)))
+	                            : 200;
+	                    const insights = await vectorStore.getPromptInsights(userSub, { countLimit, sampleLimit });
+	                    const countText = insights.isCountCapped ? `${insights.promptCount}+` : `${insights.promptCount}`;
+	                    return {
+	                        content: [
+	                            {
+	                                type: "text",
+	                                text:
+	                                    `You have ${countText} saved prompts. ` +
+	                                    (insights.lastSavedAt ? `Last saved: ${insights.lastSavedAt}. ` : "") +
+	                                    (insights.firstSavedAt ? `First saved: ${insights.firstSavedAt}.` : ""),
+	                            },
+	                        ],
+	                        structuredContent: {
+	                            status: "success",
+	                            insights,
+	                        },
+	                    } as any;
+	                } catch (error) {
+	                    console.error("promptInsights failed", error);
+	                    return {
+	                        isError: true,
+	                        content: [{ type: "text", text: "Failed to compute prompt insights." }],
+	                    } as any;
+	                }
+	            }
 
-            const widget = widgetsById.get("fetchPrompt");
-            if (!widget) {
-                throw new Error(`Unknown tool: ${_request.params.name}`);
-            }
+	            const widget = widgetsById.get("fetchPrompt");
+	            if (!widget) {
+	                throw new Error(`Unknown tool: ${_request.params.name}`);
+	            }
 
             const userSub = authContext.subject!;
             const query =

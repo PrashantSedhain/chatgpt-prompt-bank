@@ -9,6 +9,7 @@ import {
     GetIndexCommand,
     GetVectorsCommand,
     ListVectorsCommand,
+    type ListVectorsCommandOutput,
     PutVectorsCommand,
     QueryVectorsCommand,
     type PutInputVector,
@@ -46,6 +47,16 @@ export type PromptRecord = {
     metadata: PromptMetadata;
 };
 
+export type PromptInsights = {
+    indexName: string;
+    promptCount: number;
+    isCountCapped: boolean;
+    sampleSize: number;
+    firstSavedAt?: string;
+    lastSavedAt?: string;
+    topTags: Array<{ tag: string; count: number }>;
+};
+
 type ParsedS3VectorsArn = {
     region: string;
     accountId: string;
@@ -60,6 +71,12 @@ function promptKeyFromText(text: string) {
     const normalized = normalizePromptForKey(text);
     const hash = createHash("sha256").update(normalized).digest("hex").slice(0, 32);
     return `p-${hash}`;
+}
+
+function parseIsoTimeMs(value: unknown): number | undefined {
+    if (typeof value !== "string") return undefined;
+    const ms = Date.parse(value);
+    return Number.isFinite(ms) ? ms : undefined;
 }
 
 function parseS3VectorsArn(arn: string): ParsedS3VectorsArn {
@@ -485,5 +502,87 @@ export class AwsVectorStore {
             })
             .filter((v): v is PromptRecord => v !== null)
             .slice(0, limit);
+    }
+
+    async getPromptInsights(
+        userSub: string,
+        opts?: { countLimit?: number; sampleLimit?: number }
+    ): Promise<PromptInsights> {
+        const indexName = await this.ensureUserIndex(userSub);
+        const countLimit = Math.max(100, Math.min(opts?.countLimit ?? 2000, 20000));
+        const sampleLimit = Math.max(20, Math.min(opts?.sampleLimit ?? 200, 1000));
+
+        // 1) Cheap-ish count: page through keys only up to a cap.
+        let promptCount = 0;
+        let countNextToken: string | undefined = undefined;
+        do {
+            const page: ListVectorsCommandOutput = await this.vectorsClient.send(
+                new ListVectorsCommand({
+                    vectorBucketName: this.vectorBucketName,
+                    indexName,
+                    maxResults: Math.min(500, countLimit - promptCount),
+                    nextToken: countNextToken,
+                    returnMetadata: false,
+                    returnData: false,
+                })
+            );
+            countNextToken = typeof page.nextToken === "string" ? page.nextToken : undefined;
+            const vectors = Array.isArray(page.vectors) ? page.vectors : [];
+            promptCount += vectors.length;
+        } while (countNextToken && promptCount < countLimit);
+
+        const isCountCapped = promptCount >= countLimit;
+
+        // 2) Small sample with metadata: derive top tags + approximate first/last saved.
+        const tagCounts = new Map<string, number>();
+        let firstSavedMs: number | undefined;
+        let lastSavedMs: number | undefined;
+
+        const samplePage: ListVectorsCommandOutput = await this.vectorsClient.send(
+            new ListVectorsCommand({
+                vectorBucketName: this.vectorBucketName,
+                indexName,
+                maxResults: sampleLimit,
+                returnMetadata: true,
+                returnData: false,
+            })
+        );
+
+        const sampleVectors = Array.isArray(samplePage.vectors) ? samplePage.vectors : [];
+        for (const v of sampleVectors) {
+            const metadata = v.metadata;
+            if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) continue;
+            const text = (metadata as any).text;
+            if (typeof v.key !== "string" || typeof text !== "string" || !text.trim()) continue;
+
+            const createdAt = parseIsoTimeMs((metadata as any).createdAt);
+            const updatedAt = parseIsoTimeMs((metadata as any).updatedAt);
+            const savedAt = updatedAt ?? createdAt;
+            if (savedAt != null) {
+                firstSavedMs = firstSavedMs == null ? savedAt : Math.min(firstSavedMs, savedAt);
+                lastSavedMs = lastSavedMs == null ? savedAt : Math.max(lastSavedMs, savedAt);
+            }
+
+            const tags = Array.isArray((metadata as any).tags) ? (metadata as any).tags : [];
+            for (const t of tags) {
+                if (typeof t !== "string" || !t.trim()) continue;
+                tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
+            }
+        }
+
+        const topTags = Array.from(tagCounts.entries())
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 8)
+            .map(([tag, count]) => ({ tag, count }));
+
+        return {
+            indexName,
+            promptCount,
+            isCountCapped,
+            sampleSize: sampleVectors.length,
+            firstSavedAt: firstSavedMs != null ? new Date(firstSavedMs).toISOString() : undefined,
+            lastSavedAt: lastSavedMs != null ? new Date(lastSavedMs).toISOString() : undefined,
+            topTags,
+        };
     }
 }
