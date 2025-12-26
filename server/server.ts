@@ -28,6 +28,8 @@ import {
     type Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 
+import { AwsVectorStore } from "./awsVectorStore.js";
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, "..");
 const ASSETS_DIR = path.resolve(ROOT_DIR, "assets");
@@ -37,11 +39,26 @@ const AUTH0_ISSUER = process.env.AUTH0_ISSUER ?? "";
 const AUTH0_AUDIENCE = process.env.AUTH0_AUDIENCE ?? "";
 const AUTH0_SCOPES = process.env.AUTH0_SCOPES ?? "prompts:read prompts:write";
 
+const S3VECTORS_ARN =
+    process.env.S3VECTORS_ARN ??
+    "arn:aws:s3vectors:us-east-1:559118953851:bucket/prompt-bank-vectors";
+const AWS_REGION = process.env.AWS_REGION ?? "us-east-1";
+const BEDROCK_REGION = process.env.BEDROCK_REGION ?? "us-east-1";
+const BEDROCK_EMBEDDING_MODEL_ID =
+    process.env.BEDROCK_EMBEDDING_MODEL_ID ?? "amazon.titan-embed-text-v2:0";
+
 const requiredScopes = AUTH0_SCOPES.split(/[ ,]+/).filter(Boolean);
 const parsedBaseUrl = new URL(MCP_BASE_URL);
 const resourcePath = parsedBaseUrl.pathname === "/" ? "" : parsedBaseUrl.pathname;
 const protectedResourcePath = `/.well-known/oauth-protected-resource${resourcePath}`;
 const protectedResourceMetadataUrl = `${parsedBaseUrl.origin}${protectedResourcePath}`;
+
+const vectorStore = new AwsVectorStore({
+    s3VectorsArn: S3VECTORS_ARN,
+    region: AWS_REGION,
+    bedrockRegion: BEDROCK_REGION,
+    bedrockEmbeddingModelId: BEDROCK_EMBEDDING_MODEL_ID,
+});
 
 const jwks = AUTH0_ISSUER
     ? createRemoteJWKSet(new URL(`${AUTH0_ISSUER.replace(/\/?$/, "/")}.well-known/jwks.json`))
@@ -61,6 +78,7 @@ type AuthContext = {
     authorized: boolean;
     scopes: Set<string>;
     error?: string;
+    subject?: string;
 };
 
 function readWidgetHtml(componentName: string): string {
@@ -139,37 +157,11 @@ async function validateAuthHeader(authHeader: string | undefined): Promise<AuthC
     }
 
     const token = authHeader.slice("Bearer ".length).trim();
-    const segments = token.split(".");
-    const tokenParts = segments.length;
-    const headerSegment = segments[0] ?? "";
-    console.log("Auth token summary", {
-        length: token.length,
-        parts: tokenParts,
-        prefix: token.slice(0, 12),
-        suffix: token.slice(-6),
-        headerSegment,
-    });
-    if (tokenParts !== 3) {
-        if (tokenParts === 5) {
-            console.warn(
-                "Unsupported token format: looks like a JWE (encrypted token). This server expects a 3-part JWS JWT.",
-                { parts: tokenParts }
-            );
-        }
-        console.warn("Unsupported token format (expected 3-part JWS JWT)", {
-            parts: tokenParts,
-        });
-        return { authorized: false, scopes: new Set(), error: "invalid_token" };
-    }
+
     try {
         const { payload } = await jwtVerify(token, jwks, {
             issuer: AUTH0_ISSUER,
             audience: AUTH0_AUDIENCE,
-        });
-        console.log("JWT verified", {
-            sub: payload.sub,
-            aud: payload.aud,
-            iss: payload.iss,
         });
         const scopeClaim = typeof payload.scope === "string" ? payload.scope : "";
         const permissionsClaim = Array.isArray(payload.permissions) ? payload.permissions : [];
@@ -200,10 +192,19 @@ async function validateAuthHeader(authHeader: string | undefined): Promise<AuthC
                     missingScope,
                     tokenScopes: Array.from(tokenScopes),
                 });
-                return { authorized: false, scopes: tokenScopes, error: "insufficient_scope" };
+                return {
+                    authorized: false,
+                    scopes: tokenScopes,
+                    error: "insufficient_scope",
+                    subject: typeof payload.sub === "string" ? payload.sub : undefined,
+                };
             }
         }
-        return { authorized: true, scopes: tokenScopes };
+        return {
+            authorized: true,
+            scopes: tokenScopes,
+            subject: typeof payload.sub === "string" ? payload.sub : undefined,
+        };
     } catch (error) {
         console.error("Token verification failed", error);
         return { authorized: false, scopes: new Set(), error: "invalid_token" };
@@ -241,9 +242,13 @@ widgets.forEach((widget) => {
 const fetchPromptSchema: Tool["inputSchema"] = {
     type: "object",
     properties: {
+        query: {
+            type: "string",
+            description: "Text to search for the most relevant prompts.",
+        },
         name: {
             type: "string",
-            description: "Context of the text that the user is trying to retrieve.",
+            description: "Deprecated alias for `query`.",
         },
     },
     required: [],
@@ -257,8 +262,62 @@ const savePromptSchema: Tool["inputSchema"] = {
             type: "string",
             description: "Prompt text to save for the current user.",
         },
+        title: {
+            type: "string",
+            description: "Optional short title for this prompt.",
+        },
+        tags: {
+            type: "array",
+            items: { type: "string" },
+            description: "Optional tags to help organize prompts.",
+        },
+        source: {
+            type: "string",
+            description: "Optional source identifier (e.g. chatgpt, web, api).",
+        },
     },
     required: ["text"],
+    additionalProperties: false,
+};
+
+const deletePromptSchema: Tool["inputSchema"] = {
+    type: "object",
+    properties: {
+        key: {
+            type: "string",
+            description: "Vector key of the prompt to delete.",
+        },
+    },
+    required: ["key"],
+    additionalProperties: false,
+};
+
+const updatePromptSchema: Tool["inputSchema"] = {
+    type: "object",
+    properties: {
+        key: {
+            type: "string",
+            description: "Vector key of the prompt to update.",
+        },
+        text: {
+            type: "string",
+            description: "Updated prompt text.",
+        },
+        title: {
+            type: "string",
+            description: "Optional updated title for this prompt.",
+        },
+        tags: {
+            type: "array",
+            items: { type: "string" },
+            description: "Optional updated tags for this prompt.",
+        },
+        source: {
+            type: "string",
+            description: "Optional updated source identifier.",
+        },
+    },
+    required: ["key", "text"],
     additionalProperties: false,
 };
 
@@ -294,7 +353,31 @@ const tools: Tool[] = [
         annotations: {
             destructiveHint: false,
             openWorldHint: false,
-            readOnlyHint: true,
+            readOnlyHint: false,
+        },
+        securitySchemes: oauthSecuritySchemes,
+    },
+    {
+        name: "deletePrompt",
+        title: "Delete prompt",
+        description: "Delete a saved prompt for the authenticated user.",
+        inputSchema: deletePromptSchema,
+        annotations: {
+            destructiveHint: true,
+            openWorldHint: false,
+            readOnlyHint: false,
+        },
+        securitySchemes: oauthSecuritySchemes,
+    },
+    {
+        name: "updatePrompt",
+        title: "Update prompt",
+        description: "Update a saved prompt for the authenticated user.",
+        inputSchema: updatePromptSchema,
+        annotations: {
+            destructiveHint: false,
+            openWorldHint: false,
+            readOnlyHint: false,
         },
         securitySchemes: oauthSecuritySchemes,
     },
@@ -380,7 +463,11 @@ function createServerInstance(authContext: AuthContext): Server {
             console.log("CallTool request", { toolName, authorized: authContext.authorized });
             const normalizedToolName =
                 toolName === "fetchRelevantPrompts" ? "fetchPrompt" : toolName;
-            const requiresAuth = normalizedToolName === "fetchPrompt" || normalizedToolName === "savePrompt";
+            const requiresAuth =
+                normalizedToolName === "fetchPrompt" ||
+                normalizedToolName === "savePrompt" ||
+                normalizedToolName === "deletePrompt" ||
+                normalizedToolName === "updatePrompt";
 
             if (!authContext.authorized && requiresAuth) {
                 const error =
@@ -398,7 +485,43 @@ function createServerInstance(authContext: AuthContext): Server {
                 return authErrorResult(message, error);
             }
 
+            if (requiresAuth && !authContext.subject) {
+                return authErrorResult("Authentication required: missing user identity on token.", "invalid_token");
+            }
+
             if (normalizedToolName === "savePrompt") {
+                const userSub = authContext.subject!;
+                const text = typeof _request.params.arguments?.text === "string" ? _request.params.arguments.text : "";
+                if (!text.trim()) {
+                    return {
+                        isError: true,
+                        content: [{ type: "text", text: "Missing required input: `text`." }],
+                    } as any;
+                }
+
+                let id: string;
+                let indexName: string;
+                let metadata: any;
+                try {
+                    const title =
+                        typeof _request.params.arguments?.title === "string" ? _request.params.arguments.title : undefined;
+                    const source =
+                        typeof _request.params.arguments?.source === "string" ? _request.params.arguments.source : undefined;
+                    const tags =
+                        Array.isArray(_request.params.arguments?.tags)
+                            ? (_request.params.arguments?.tags as unknown[]).filter((t): t is string => typeof t === "string")
+                            : undefined;
+                    const result = await vectorStore.upsertPrompt(userSub, text, { title, tags, source });
+                    id = result.id;
+                    indexName = result.indexName;
+                    metadata = result.metadata;
+                } catch (error) {
+                    console.error("savePrompt failed", error);
+                    return {
+                        isError: true,
+                        content: [{ type: "text", text: "Failed to save prompt." }],
+                    } as any;
+                }
                 return {
                     content: [
                         {
@@ -408,8 +531,81 @@ function createServerInstance(authContext: AuthContext): Server {
                     ],
                     structuredContent: {
                         status: "success",
+                        id,
+                        indexName,
+                        prompt: metadata,
                     },
                 } as any;
+            }
+
+            if (normalizedToolName === "deletePrompt") {
+                const userSub = authContext.subject!;
+                const key = typeof _request.params.arguments?.key === "string" ? _request.params.arguments.key : "";
+                if (!key.trim()) {
+                    return {
+                        isError: true,
+                        content: [{ type: "text", text: "Missing required input: `key`." }],
+                    } as any;
+                }
+
+                try {
+                    const result = await vectorStore.deletePrompt(userSub, key);
+                    return {
+                        content: [{ type: "text", text: result.deleted ? "Prompt deleted." : "Prompt not found." }],
+                        structuredContent: {
+                            status: "success",
+                            deleted: result.deleted,
+                            key,
+                            indexName: result.indexName,
+                        },
+                    } as any;
+                } catch (error) {
+                    console.error("deletePrompt failed", error);
+                    return {
+                        isError: true,
+                        content: [{ type: "text", text: "Failed to delete prompt." }],
+                    } as any;
+                }
+            }
+
+            if (normalizedToolName === "updatePrompt") {
+                const userSub = authContext.subject!;
+                const key = typeof _request.params.arguments?.key === "string" ? _request.params.arguments.key : "";
+                const text = typeof _request.params.arguments?.text === "string" ? _request.params.arguments.text : "";
+                if (!key.trim() || !text.trim()) {
+                    return {
+                        isError: true,
+                        content: [{ type: "text", text: "Missing required input: `key` and `text`." }],
+                    } as any;
+                }
+
+                const title =
+                    typeof _request.params.arguments?.title === "string" ? _request.params.arguments.title : undefined;
+                const source =
+                    typeof _request.params.arguments?.source === "string" ? _request.params.arguments.source : undefined;
+                const tags =
+                    Array.isArray(_request.params.arguments?.tags)
+                        ? (_request.params.arguments?.tags as unknown[]).filter((t): t is string => typeof t === "string")
+                        : undefined;
+
+                try {
+                    const result = await vectorStore.updatePrompt(userSub, key, text, { title, tags, source });
+                    return {
+                        content: [{ type: "text", text: "Prompt updated." }],
+                        structuredContent: {
+                            status: "success",
+                            key,
+                            indexName: result.indexName,
+                            prompt: result.metadata,
+                        },
+                    } as any;
+                } catch (error) {
+                    console.error("updatePrompt failed", error);
+                    return {
+                        isError: true,
+                        content: [{ type: "text", text: "Failed to update prompt." }],
+                    } as any;
+                }
             }
 
             const widget = widgetsById.get("fetchPrompt");
@@ -417,21 +613,40 @@ function createServerInstance(authContext: AuthContext): Server {
                 throw new Error(`Unknown tool: ${_request.params.name}`);
             }
 
-            const prompts = [
-                "Create a high-detail digital painting of a cat who is an elite cyberpunk hacker, surrounded by glowing green terminals in a dark room, wearing tiny Matrix-style sunglasses and a tiny leather jacket.",
-                "Generate a majestic oil painting of a cat as a 17th-century French aristocrat, wearing an oversized ruffled lace collar and a powdered wig, sitting proudly next to a bowl of golden milk in a gilded palace.",
-                "Design a hilarious 3D cartoon of a cat as a chubby astronaut floating weightlessly in the International Space Station, desperately trying to catch a floating blob of tuna while wearing a tiny space suit.",
-            ];
+            const userSub = authContext.subject!;
+            const query =
+                typeof _request.params.arguments?.query === "string"
+                    ? _request.params.arguments.query
+                    : typeof _request.params.arguments?.name === "string"
+                        ? _request.params.arguments.name
+                        : "";
+            let matches: any[] = [];
+            let prompts: string[] = [];
+            try {
+                const trimmedQuery = query.trim();
+                matches = trimmedQuery
+                    ? await vectorStore.queryPromptRecords(userSub, trimmedQuery, 4)
+                    : await vectorStore.listPromptRecords(userSub, 4);
+                prompts = matches
+                    .map((m) => m?.metadata?.text)
+                    .filter((t: unknown): t is string => typeof t === "string" && t.trim().length > 0)
+                    .slice(0, 4);
+            } catch (error) {
+                console.error("fetchPrompt failed", error);
+                prompts = [];
+                matches = [];
+            }
 
             return {
                 structuredContent: {
                     prompts,
+                    matches,
                     status: "success",
                 },
                 content: [
                     {
                         type: "text",
-                        text: "I've retrieved your saved image generation prompts from PromptBank. You can select one from the widget below to generate the image.",
+                        text: "Here are your top prompt suggestions from PromptBank.",
                     },
                 ],
                 _meta: {
@@ -479,10 +694,12 @@ async function handleSseRequest(req: IncomingMessage, res: ServerResponse) {
         authContext.authorized = authResult.authorized;
         authContext.scopes = authResult.scopes;
         authContext.error = authResult.error;
+        authContext.subject = authResult.subject;
         console.log("SSE auth context", {
             authorized: authContext.authorized,
             scopes: Array.from(authContext.scopes),
             error: authContext.error,
+            subject: authContext.subject ?? null,
         });
         await server.connect(transport);
     } catch (error) {
@@ -520,10 +737,12 @@ async function handlePostMessage(
         session.authContext.authorized = authResult.authorized;
         session.authContext.scopes = authResult.scopes;
         session.authContext.error = authResult.error;
+        session.authContext.subject = authResult.subject;
         console.log("POST auth context", {
             authorized: session.authContext.authorized,
             scopes: Array.from(session.authContext.scopes),
             error: session.authContext.error,
+            subject: session.authContext.subject ?? null,
         });
         await session.transport.handlePostMessage(req, res);
     } catch (error) {
