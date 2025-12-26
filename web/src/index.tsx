@@ -5,7 +5,12 @@ import { createRoot } from "react-dom/client"
 import { PromptSuggestion } from "./PromptSuggestion"
 import { useOpenAiGlobal } from "../useOpenaiGlobal"
 
-type ToolOutput = { prompts?: string[] } | null
+type ToolOutput =
+  | {
+      prompts?: string[]
+      matches?: Array<{ key: string; metadata?: { text?: string; preview?: string } }>
+    }
+  | null
 
 function LoadingSkeleton() {
   return (
@@ -27,12 +32,13 @@ function LoadingSkeleton() {
 function App() {
   const toolOutput = useOpenAiGlobal("toolOutput") as ToolOutput
   const prompts = toolOutput?.prompts
+  const matches = toolOutput?.matches
 
-  if (!prompts || prompts.length === 0) {
+  if (toolOutput == null) {
     return <LoadingSkeleton />
   }
 
-  return <PromptSuggestion prompts={prompts} />
+  return <PromptSuggestion prompts={prompts ?? []} matches={matches ?? undefined} />
 }
 
 const rootElement = document.getElementById("root")

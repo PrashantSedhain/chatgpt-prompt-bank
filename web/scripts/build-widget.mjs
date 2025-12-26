@@ -7,7 +7,38 @@ const ROOT_DIR = path.resolve(__dirname, "..")
 const DIST_DIR = path.join(ROOT_DIR, "dist")
 const ASSETS_DIR = path.resolve(ROOT_DIR, "..", "assets")
 
-const htmlPath = path.join(ASSETS_DIR, "prompt-suggestions.html")
+function loadEnvFromServerDotEnv() {
+  const dotEnvPath = path.resolve(ROOT_DIR, "..", "server", ".env")
+  if (!fs.existsSync(dotEnvPath)) return
+  const contents = fs.readFileSync(dotEnvPath, "utf8")
+  for (const line of contents.split(/\r?\n/g)) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith("#")) continue
+    const exportMatch = trimmed.match(/^export\s+([A-Z0-9_]+)=(.*)$/)
+    const plainMatch = trimmed.match(/^([A-Z0-9_]+)=(.*)$/)
+    const match = exportMatch ?? plainMatch
+    if (!match) continue
+    const key = match[1]
+    if (process.env[key] != null) continue
+    let value = match[2].trim()
+    if ((value.startsWith("\"") && value.endsWith("\"")) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1)
+    }
+    process.env[key] = value
+  }
+}
+
+function sanitizeVersion(value) {
+  const cleaned = String(value ?? "").trim().replace(/[^a-zA-Z0-9_-]/g, "")
+  return cleaned || undefined
+}
+
+loadEnvFromServerDotEnv()
+
+const widgetVersion = sanitizeVersion(process.env.WIDGET_VERSION) ?? sanitizeVersion(Date.now()) ?? "dev"
+const baseName = `prompt-suggestions-${widgetVersion}`
+const htmlPath = path.join(ASSETS_DIR, `${baseName}.html`)
+const legacyHtmlPath = path.join(ASSETS_DIR, "prompt-suggestions.html")
 
 if (!fs.existsSync(DIST_DIR)) {
   throw new Error(`Missing dist directory at ${DIST_DIR}. Run "npm run build" first.`)
@@ -42,5 +73,7 @@ ${js}
 
 fs.mkdirSync(ASSETS_DIR, { recursive: true })
 fs.writeFileSync(htmlPath, html, "utf8")
+fs.writeFileSync(legacyHtmlPath, html, "utf8")
 
 console.log(`Wrote widget HTML to ${htmlPath}`)
+console.log(`Wrote widget HTML to ${legacyHtmlPath}`)

@@ -29,7 +29,8 @@ body {
 }
 
 .prompt-list {
-  width: min(760px, 100%);
+  width: 760px;
+  max-width: 100%;
   margin: 0 auto;
   padding: 12px 12px 14px;
   display: flex;
@@ -66,9 +67,20 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: 320px;
+  max-height: min(520px, calc(100vh - 140px));
   overflow-y: auto;
   padding-right: 4px;
+}
+
+.prompt-empty {
+  padding: 18px 14px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  background: rgba(248, 250, 252, 0.7);
+  color: #475569;
+  font-weight: 700;
+  font-size: 13px;
+  text-align: center;
 }
 
 .prompt-card {
@@ -82,6 +94,135 @@ body {
   border-radius: 12px;
   box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
   backdrop-filter: blur(6px);
+}
+
+.prompt-row {
+  padding: 0;
+  overflow: hidden;
+}
+
+.prompt-row-main {
+  flex: 1;
+  display: flex;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  border-radius: 12px;
+  min-height: 76px;
+}
+
+.prompt-edit {
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+.prompt-row-content {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  padding: 14px 16px;
+  text-align: left;
+}
+
+.prompt-row-actions {
+  display: flex;
+  align-items: flex-end;
+  padding: 0 16px 12px 16px;
+}
+
+.prompt-edit-input {
+  width: 100%;
+  resize: vertical;
+  min-height: 84px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 1.4;
+  font-family: inherit;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.prompt-edit-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.edit-save-button {
+  border: 1px solid #93c5fd;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-weight: 800;
+  font-size: 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.edit-save-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.edit-cancel-button {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #0f172a;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.icon-button {
+  border-radius: 10px;
+  font-weight: 800;
+  font-size: 12px;
+  padding: 8px 12px;
+  cursor: pointer;
+  margin: 14px 0;
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease, opacity 120ms ease;
+}
+
+.edit-button {
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1e3a8a;
+  margin-right: 8px;
+}
+
+.edit-button:hover {
+  background: #dbeafe;
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.12);
+}
+
+.prompt-row-main:hover {
+  background: rgba(248, 250, 252, 0.7);
+}
+
+.delete-button {
+  border: 1px solid #fecaca;
+  background: #fff1f2;
+  color: #991b1b;
+  margin-right: 16px;
+}
+
+.delete-button:hover {
+  background: #ffe4e6;
+  box-shadow: 0 6px 18px rgba(225, 29, 72, 0.14);
+}
+
+.icon-button:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+.icon-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .prompt-clickable {
@@ -140,6 +281,17 @@ body {
   flex: 1;
   line-height: 1.45;
   font-size: 14px;
+}
+
+.prompt-text.is-collapsed {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+.prompt-text.is-expanded {
+  display: block;
 }
 
 .copy-button {

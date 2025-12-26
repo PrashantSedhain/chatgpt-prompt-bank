@@ -31,6 +31,9 @@ export type PromptMetadata = {
     title?: string;
     tags?: string[];
     source?: string;
+    uploadId?: string;
+    chunkIndex?: number;
+    chunkCount?: number;
     createdAt: string;
     updatedAt: string;
     length: number;
@@ -48,6 +51,16 @@ type ParsedS3VectorsArn = {
     accountId: string;
     bucketName: string;
 };
+
+function normalizePromptForKey(text: string) {
+    return text.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function promptKeyFromText(text: string) {
+    const normalized = normalizePromptForKey(text);
+    const hash = createHash("sha256").update(normalized).digest("hex").slice(0, 32);
+    return `p-${hash}`;
+}
 
 function parseS3VectorsArn(arn: string): ParsedS3VectorsArn {
     // Example: arn:aws:s3vectors:us-east-1:559118953851:bucket/prompt-bank-vectors
@@ -232,7 +245,7 @@ export class AwsVectorStore {
         extra?: Pick<PromptMetadata, "title" | "tags" | "source">
     ): Promise<{ id: string; indexName: string; metadata: PromptMetadata }> {
         const indexName = await this.ensureUserIndex(userSub);
-        const id = randomUUID();
+        const id = promptKeyFromText(promptText);
         const vector = await this.embedText(promptText);
 
         const now = new Date().toISOString();
@@ -265,6 +278,72 @@ export class AwsVectorStore {
         );
 
         return { id, indexName, metadata };
+    }
+
+    async upsertPrompts(
+        userSub: string,
+        prompts: Array<{ text: string; title?: string; tags?: string[]; source?: string }>,
+        opts?: { uploadId?: string }
+    ): Promise<{ indexName: string; uploadId: string; saved: Array<{ key: string; metadata: PromptMetadata }> }> {
+        const indexName = await this.ensureUserIndex(userSub);
+        const uploadId = opts?.uploadId ?? randomUUID();
+        const now = new Date().toISOString();
+        const seenKeys = new Set<string>();
+
+        const saved: Array<{ key: string; metadata: PromptMetadata }> = [];
+        const vectors: PutInputVector[] = [];
+
+        const uniquePrompts: Array<{ key: string; text: string; title?: string; tags?: string[]; source?: string }> = [];
+        for (const prompt of prompts) {
+            const key = promptKeyFromText(prompt.text);
+            if (seenKeys.has(key)) continue;
+            seenKeys.add(key);
+            uniquePrompts.push({ key, ...prompt });
+        }
+
+        const chunkCount = uniquePrompts.length;
+
+        for (let i = 0; i < uniquePrompts.length; i++) {
+            const { key, text, title, tags, source } = uniquePrompts[i];
+            const embedding = await this.embedText(text);
+            const metadata: PromptMetadata = {
+                schemaVersion: 1,
+                modelId: this.config.bedrockEmbeddingModelId,
+                text,
+                preview: previewText(text),
+                title: title?.trim() || undefined,
+                tags: tags?.length ? tags : undefined,
+                source: source?.trim() || undefined,
+                uploadId,
+                chunkIndex: i,
+                chunkCount,
+                createdAt: now,
+                updatedAt: now,
+                length: text.length,
+                wordCount: wordCount(text),
+            };
+
+                vectors.push({
+                    key,
+                    data: { float32: embedding },
+                    metadata,
+                });
+                saved.push({ key, metadata });
+        }
+
+        if (vectors.length === 0) {
+            return { indexName, uploadId, saved };
+        }
+
+        await this.vectorsClient.send(
+            new PutVectorsCommand({
+                vectorBucketName: this.vectorBucketName,
+                indexName,
+                vectors,
+            })
+        );
+
+        return { indexName, uploadId, saved };
     }
 
     async deletePrompt(userSub: string, key: string): Promise<{ indexName: string; deleted: boolean }> {
@@ -346,17 +425,23 @@ export class AwsVectorStore {
         return { indexName, metadata };
     }
 
-    async queryPromptRecords(userSub: string, queryText: string, k = 4): Promise<PromptRecord[]> {
+    async queryPromptRecords(
+        userSub: string,
+        queryText: string,
+        opts?: { topK?: number; returnDistance?: boolean }
+    ): Promise<PromptRecord[]> {
         const indexName = await this.ensureUserIndex(userSub);
         const queryVector = await this.embedText(queryText);
+        const topK = Math.max(1, Math.min(opts?.topK ?? 4, 200));
 
         const result = await this.vectorsClient.send(
             new QueryVectorsCommand({
                 vectorBucketName: this.vectorBucketName,
                 indexName,
                 queryVector: { float32: queryVector },
-                topK: k,
+                topK,
                 returnMetadata: true,
+                returnDistance: opts?.returnDistance ?? true,
             })
         );
 
@@ -375,7 +460,7 @@ export class AwsVectorStore {
                 };
             })
             .filter((v): v is PromptRecord => v !== null)
-            .slice(0, k);
+            .slice(0, topK);
     }
 
     async listPromptRecords(userSub: string, limit = 4): Promise<PromptRecord[]> {
