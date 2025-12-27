@@ -12,6 +12,8 @@ FROM node:20-slim
 
 WORKDIR /app
 ENV NODE_ENV=production
+ARG WIDGET_VERSION=19
+ENV WIDGET_VERSION=$WIDGET_VERSION
 
 COPY --from=build /app/server/dist ./dist
 COPY --from=build /app/server/node_modules ./node_modules
@@ -23,4 +25,3 @@ ENV PORT=8000
 EXPOSE 8000
 
 CMD ["node", "dist/server.js"]
-

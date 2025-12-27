@@ -1226,9 +1226,42 @@ const sessions = new Map<string, SessionRecord>();
 const ssePath = "/mcp";
 const postPath = "/mcp/messages";
 
+function writeAuthHttpError(res: ServerResponse, auth: AuthContext) {
+    const error = auth.error ?? "invalid_token";
+    const description =
+        error === "missing_token"
+            ? "Missing Authorization header"
+            : error === "insufficient_scope"
+              ? "Missing required scope"
+              : error === "auth_config_missing"
+                ? "Server auth configuration missing"
+                : "Invalid access token";
+    const statusCode = error === "insufficient_scope" ? 403 : 401;
+
+    res.writeHead(statusCode, {
+        "Content-Type": "text/plain",
+        "WWW-Authenticate": buildWwwAuthenticate(error, description),
+        "Cache-Control": "no-store",
+    });
+    res.end(description);
+}
+
 async function handleSseRequest(req: IncomingMessage, res: ServerResponse) {
     res.setHeader("Access-Control-Allow-Origin", "*");
-    const authContext: AuthContext = { authorized: false, scopes: new Set() };
+    res.setHeader("Access-Control-Allow-Headers", "content-type, authorization");
+
+    const authResult = await validateAuthHeader(req.headers.authorization);
+    if (!authResult.authorized) {
+        writeAuthHttpError(res, authResult);
+        return;
+    }
+
+    const authContext: AuthContext = {
+        authorized: authResult.authorized,
+        scopes: authResult.scopes,
+        error: authResult.error,
+        subject: authResult.subject,
+    };
     const server = createServerInstance(authContext);
     const transport = new SSEServerTransport(postPath, res);
     const sessionId = transport.sessionId;
@@ -1245,11 +1278,6 @@ async function handleSseRequest(req: IncomingMessage, res: ServerResponse) {
     };
 
     try {
-        const authResult = await validateAuthHeader(req.headers.authorization);
-        authContext.authorized = authResult.authorized;
-        authContext.scopes = authResult.scopes;
-        authContext.error = authResult.error;
-        authContext.subject = authResult.subject;
         console.log("SSE auth context", {
             authorized: authContext.authorized,
             scopes: Array.from(authContext.scopes),
@@ -1280,6 +1308,12 @@ async function handlePostMessage(
         return;
     }
 
+    const authResult = await validateAuthHeader(req.headers.authorization);
+    if (!authResult.authorized) {
+        writeAuthHttpError(res, authResult);
+        return;
+    }
+
     const session = sessions.get(sessionId);
 
     if (!session) {
@@ -1288,11 +1322,14 @@ async function handlePostMessage(
     }
 
     try {
-        const authResult = await validateAuthHeader(req.headers.authorization);
+        if (session.authContext.subject && authResult.subject && session.authContext.subject !== authResult.subject) {
+            res.writeHead(403).end("Session subject mismatch");
+            return;
+        }
         session.authContext.authorized = authResult.authorized;
         session.authContext.scopes = authResult.scopes;
         session.authContext.error = authResult.error;
-        session.authContext.subject = authResult.subject;
+        session.authContext.subject = authResult.subject ?? session.authContext.subject;
         await session.transport.handlePostMessage(req, res);
     } catch (error) {
         console.error("Failed to process message", error);
@@ -1314,6 +1351,11 @@ const httpServer = createServer(
 
         const url = new URL(req.url, `http://${req.headers.host ?? "localhost"}`);
         console.log(`[${req.method}] ${url.pathname}${url.search}`);
+
+        if (req.method === "GET" && url.pathname === "/health") {
+            res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify({ ok: true }));
+            return;
+        }
 
         if (req.method === "GET" && url.pathname === protectedResourcePath) {
             const body = {

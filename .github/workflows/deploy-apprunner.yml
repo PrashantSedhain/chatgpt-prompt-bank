@@ -6,6 +6,7 @@ on:
     paths:
       - "server/**"
       - "assets/**"
+      - "web/**"
       - "Dockerfile"
       - ".dockerignore"
       - ".github/workflows/deploy-apprunner.yml"
@@ -29,10 +30,18 @@ jobs:
       ECR_REPOSITORY: chatgpt-prompt-bank
       IMAGE_TAG: ${{ github.sha }}
       IMAGE_TAG_LATEST: ${{ secrets.IMAGE_TAG_LATEST || 'latest' }}
+      WIDGET_VERSION: ${{ github.sha }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
@@ -70,15 +79,28 @@ jobs:
             aws ecr create-repository --region "$AWS_REGION" --repository-name "$ECR_REPOSITORY" >/dev/null
           fi
 
+      - name: Build widget assets (versioned)
+        env:
+          WIDGET_VERSION: ${{ env.WIDGET_VERSION }}
+        run: |
+          set -euo pipefail
+          npm ci --prefix web
+          WIDGET_VERSION="$WIDGET_VERSION" npm --prefix web run build:widget
+
       - name: Build and push image
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           REPOSITORY: ${{ steps.cfg.outputs.ecr_repository }}
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
           IMAGE_TAG_LATEST: ${{ env.IMAGE_TAG_LATEST }}
+          WIDGET_VERSION: ${{ env.WIDGET_VERSION }}
         run: |
           set -euo pipefail
-          docker build -t "$REGISTRY/$REPOSITORY:$IMAGE_TAG" -t "$REGISTRY/$REPOSITORY:$IMAGE_TAG_LATEST" .
+          docker build \
+            --build-arg WIDGET_VERSION="$WIDGET_VERSION" \
+            -t "$REGISTRY/$REPOSITORY:$IMAGE_TAG" \
+            -t "$REGISTRY/$REPOSITORY:$IMAGE_TAG_LATEST" \
+            .
           docker push "$REGISTRY/$REPOSITORY:$IMAGE_TAG"
           docker push "$REGISTRY/$REPOSITORY:$IMAGE_TAG_LATEST"
 
