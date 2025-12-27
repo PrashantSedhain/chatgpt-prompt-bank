@@ -5,6 +5,7 @@
   "private": true,
   "description": "MCP server for sending streamed responses.",
   "scripts": {
+    "build": "tsc -p tsconfig.json",
     "start": "tsx server.ts"
   },
   "dependencies": {

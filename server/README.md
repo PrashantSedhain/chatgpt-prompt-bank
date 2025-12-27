@@ -33,6 +33,40 @@ The server will expose:
 
 ---
 
+## ☁️ Deploy (AWS Lambda, zip)
+
+This repo includes a GitHub Actions workflow that builds the server, zips `dist/ + node_modules/ + assets/`, and runs `aws lambda update-function-code --publish`.
+
+### Required GitHub secrets
+- `AWS_ROLE_TO_ASSUME` (uses GitHub OIDC)
+
+Optional overrides (defaults are `us-east-1` and `chatgpt-prompt-bank`):
+- `AWS_REGION`
+- `LAMBDA_FUNCTION_NAME`
+
+Workflow file: `.github/workflows/deploy-lambda.yml`
+
+Note: this codebase currently runs as a long-lived HTTP server (`node:http`). To run behind Lambda + HTTPS you typically need API Gateway/Function URL integration (for example via an adapter) or a Lambda-style handler.
+
+## ☁️ Deploy (AWS App Runner, SSE-friendly)
+
+App Runner is a better fit than Lambda for SSE/long-lived connections. This repo includes a workflow that builds a Docker image, pushes it to ECR, then creates/updates an App Runner service to use that image.
+
+Workflow file: `.github/workflows/deploy-apprunner.yml`
+
+### Required GitHub secrets
+- `AWS_ROLE_TO_ASSUME` (GitHub OIDC role used by the workflow)
+- `APPRUNNER_ECR_ACCESS_ROLE_ARN` (role App Runner uses to pull from ECR)
+
+Optional overrides:
+- `AWS_REGION` (default `us-east-1`)
+- `APPRUNNER_SERVICE_NAME` (default `chatgpt-prompt-bank`)
+- `ECR_REPOSITORY` (default `chatgpt-prompt-bank`)
+- `APPRUNNER_SERVICE_ARN` (if set, workflow updates an existing service; otherwise it creates a new one)
+- `APPRUNNER_INSTANCE_ROLE_ARN` (if set, attached to the service so the app can call AWS APIs at runtime)
+
+IAM policy reference: `docs/apprunner-instance-role.md`
+
 ## 🔍 Testing & Debugging
 
 ### Using MCP Inspector
@@ -47,5 +81,3 @@ The [MCP Inspector](https://github.com/modelcontextprotocol/inspector) is the be
 
 ## 📄 License
 MIT
-
-

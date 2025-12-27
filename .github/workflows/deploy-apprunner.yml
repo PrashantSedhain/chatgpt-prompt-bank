@@ -1,0 +1,128 @@
+name: Deploy AWS App Runner (ECR)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "server/**"
+      - "assets/**"
+      - "Dockerfile"
+      - ".dockerignore"
+      - ".github/workflows/deploy-apprunner.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-apprunner-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: us-east-1
+      SERVICE_NAME: chatgpt-prompt-bank
+      ECR_REPOSITORY: chatgpt-prompt-bank
+      IMAGE_TAG: ${{ github.sha }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.AWS_REGION || env.AWS_REGION }}
+
+      - name: Resolve deploy configuration
+        id: cfg
+        shell: bash
+        run: |
+          set -euo pipefail
+          AWS_REGION="${{ secrets.AWS_REGION || env.AWS_REGION }}"
+          SERVICE_NAME="${{ secrets.APPRUNNER_SERVICE_NAME || env.SERVICE_NAME }}"
+          ECR_REPOSITORY="${{ secrets.ECR_REPOSITORY || env.ECR_REPOSITORY }}"
+          echo "aws_region=$AWS_REGION" >> "$GITHUB_OUTPUT"
+          echo "service_name=$SERVICE_NAME" >> "$GITHUB_OUTPUT"
+          echo "ecr_repository=$ECR_REPOSITORY" >> "$GITHUB_OUTPUT"
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Ensure ECR repository exists
+        shell: bash
+        env:
+          AWS_REGION: ${{ steps.cfg.outputs.aws_region }}
+          ECR_REPOSITORY: ${{ steps.cfg.outputs.ecr_repository }}
+        run: |
+          set -euo pipefail
+          if aws ecr describe-repositories --region "$AWS_REGION" --repository-names "$ECR_REPOSITORY" >/dev/null 2>&1; then
+            echo "ECR repository exists: $ECR_REPOSITORY"
+          else
+            echo "Creating ECR repository: $ECR_REPOSITORY"
+            aws ecr create-repository --region "$AWS_REGION" --repository-name "$ECR_REPOSITORY" >/dev/null
+          fi
+
+      - name: Build and push image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPOSITORY: ${{ steps.cfg.outputs.ecr_repository }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+        run: |
+          set -euo pipefail
+          docker build -t "$REGISTRY/$REPOSITORY:$IMAGE_TAG" .
+          docker push "$REGISTRY/$REPOSITORY:$IMAGE_TAG"
+          echo "image=$REGISTRY/$REPOSITORY:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update App Runner service
+        shell: bash
+        env:
+          AWS_REGION: ${{ steps.cfg.outputs.aws_region }}
+          SERVICE_NAME: ${{ steps.cfg.outputs.service_name }}
+          IMAGE_IDENTIFIER: ${{ steps.login-ecr.outputs.registry }}/${{ steps.cfg.outputs.ecr_repository }}:${{ env.IMAGE_TAG }}
+          SERVICE_ARN: ${{ secrets.APPRUNNER_SERVICE_ARN }}
+          ECR_ACCESS_ROLE_ARN: ${{ secrets.APPRUNNER_ECR_ACCESS_ROLE_ARN }}
+          INSTANCE_ROLE_ARN: ${{ secrets.APPRUNNER_INSTANCE_ROLE_ARN }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${ECR_ACCESS_ROLE_ARN:-}" ]]; then
+            echo "Missing required secret: APPRUNNER_ECR_ACCESS_ROLE_ARN"
+            exit 1
+          fi
+
+          cat > apprunner-source.json <<JSON
+          {
+            "AuthenticationConfiguration": { "AccessRoleArn": "${ECR_ACCESS_ROLE_ARN}" },
+            "ImageRepository": {
+              "ImageIdentifier": "${IMAGE_IDENTIFIER}",
+              "ImageRepositoryType": "ECR",
+              "ImageConfiguration": {
+                "Port": "8000",
+                "RuntimeEnvironmentVariables": { "NODE_ENV": "production" }
+              }
+            }
+          }
+JSON
+
+          extra_args=()
+          if [[ -n "${INSTANCE_ROLE_ARN:-}" ]]; then
+            cat > apprunner-instance.json <<JSON
+            { "InstanceRoleArn": "${INSTANCE_ROLE_ARN}" }
+JSON
+            extra_args+=(--instance-configuration file://apprunner-instance.json)
+          fi
+
+          if [[ -n "${SERVICE_ARN:-}" ]]; then
+            echo "Updating App Runner service: $SERVICE_ARN"
+            aws apprunner update-service --region "$AWS_REGION" --service-arn "$SERVICE_ARN" --source-configuration file://apprunner-source.json "${extra_args[@]}"
+          else
+            echo "Creating App Runner service: $SERVICE_NAME"
+            aws apprunner create-service --region "$AWS_REGION" --service-name "$SERVICE_NAME" --source-configuration file://apprunner-source.json "${extra_args[@]}"
+          fi

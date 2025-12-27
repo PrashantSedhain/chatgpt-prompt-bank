@@ -1,0 +1,89 @@
+name: Deploy AWS Lambda (zip)
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-lambda-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+      LAMBDA_FUNCTION_NAME: ${{ secrets.LAMBDA_FUNCTION_NAME || 'chatgpt-prompt-bank' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install server deps
+        working-directory: server
+        run: npm ci
+
+      - name: Build server
+        working-directory: server
+        run: npm run build
+
+      - name: Prune dev deps
+        working-directory: server
+        run: npm prune --omit=dev
+
+      - name: Package lambda.zip
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf lambda-package lambda.zip
+          mkdir -p lambda-package
+          cp -R server/dist lambda-package/dist
+          cp -R server/node_modules lambda-package/node_modules
+          cp server/package.json lambda-package/package.json
+          cp server/package-lock.json lambda-package/package-lock.json
+          cp -R assets lambda-package/assets
+          (cd lambda-package && zip -rq ../lambda.zip .)
+          ls -lah lambda.zip
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to Lambda
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${{ secrets.AWS_ROLE_TO_ASSUME }}" ]]; then
+            echo "Missing required secret for OIDC: AWS_ROLE_TO_ASSUME"
+            exit 1
+          fi
+          if [[ -z "${AWS_REGION:-}" ]]; then
+            echo "Missing AWS region (set secret AWS_REGION to override default us-east-1)"
+            exit 1
+          fi
+          if [[ -z "${LAMBDA_FUNCTION_NAME:-}" ]]; then
+            echo "Missing Lambda function name (set secret LAMBDA_FUNCTION_NAME to override default chatgpt-prompt-bank)"
+            exit 1
+          fi
+
+          aws lambda update-function-code \
+            --region "$AWS_REGION" \
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --zip-file "fileb://lambda.zip" \
+            --publish
+
+          aws lambda wait function-updated \
+            --region "$AWS_REGION" \
+            --function-name "$LAMBDA_FUNCTION_NAME"
