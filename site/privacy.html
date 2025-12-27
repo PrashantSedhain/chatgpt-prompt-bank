@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Privacy Policy — Prompt Bank</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header class="header">
+        <a class="back" href="./index.html">← Back</a>
+        <h1>Privacy Policy</h1>
+        <p class="subtitle">Prompt Bank</p>
+      </header>
+
+      <section class="card prose">
+        <p><strong>Last updated:</strong> <span id="last-updated"></span></p>
+
+        <h2>Summary</h2>
+        <p>
+          Prompt Bank stores prompts you choose to save and uses vector embeddings to help you search and retrieve them.
+        </p>
+
+        <h2>Information We Collect</h2>
+        <ul>
+          <li><strong>Saved prompts and metadata</strong> (title, tags, source, timestamps) that you submit.</li>
+          <li><strong>Authentication identifiers</strong> (for example, an Auth0 user subject ID) to separate user data.</li>
+          <li><strong>Operational logs</strong> (limited) for debugging and reliability.</li>
+        </ul>
+
+        <h2>How We Use Information</h2>
+        <ul>
+          <li>To provide prompt storage, search, and retrieval features.</li>
+          <li>To secure the service and prevent abuse.</li>
+          <li>To operate and improve reliability.</li>
+        </ul>
+
+        <h2>Data Processing & Storage</h2>
+        <ul>
+          <li>Prompts may be embedded using an AWS Bedrock embeddings model.</li>
+          <li>Embeddings and metadata may be stored in AWS S3 Vectors.</li>
+        </ul>
+
+        <h2>Sharing</h2>
+        <p>We do not sell your personal information. We share data only with service providers needed to operate the app.</p>
+
+        <h2>Security</h2>
+        <p>We use industry-standard measures to protect data, but no system can be guaranteed 100% secure.</p>
+
+        <h2>Contact</h2>
+        <p>
+          For privacy questions, contact:
+          <a href="mailto:support@example.com">support@example.com</a>
+        </p>
+      </section>
+    </main>
+
+    <script>
+      document.getElementById("last-updated").textContent = new Date().toISOString().slice(0, 10);
+    </script>
+  </body>
+</html>

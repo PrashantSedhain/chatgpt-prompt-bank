@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Prompt Bank — Save, Organize, and Reuse Prompts</title>
+    <meta
+      name="description"
+      content="Prompt Bank helps you save, organize, and quickly find your best prompts with tags and semantic search."
+    />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="container">
+      <section class="hero">
+        <header class="header">
+          <h1><span class="brand">Prompt Bank</span></h1>
+          <p class="subtitle">
+            A simple, private library for your prompts—save what works, organize it, and find it instantly when you need
+            it.
+          </p>
+          <div class="pill-row" aria-label="Highlights">
+            <div class="pill">Save and tag prompts</div>
+            <div class="pill">Semantic search</div>
+            <div class="pill">Personal library</div>
+            <div class="pill">SSE-powered API</div>
+          </div>
+          <div class="cta-row">
+            <a class="btn primary" href="./demo.html">Watch the demo</a>
+            <a class="btn" href="./privacy.html">Privacy policy</a>
+            <a class="btn" href="./terms.html">Terms</a>
+          </div>
+          <p class="fineprint">
+            If you’re looking for the live app URL, add it here when ready (example:
+            <a href="https://app.example.com" target="_blank" rel="noreferrer noopener">https://app.example.com</a>).
+          </p>
+        </header>
+      </section>
+
+      <section class="card">
+        <h2>What Prompt Bank Does</h2>
+        <p class="muted">
+          Prompt Bank is built for people who iterate on prompts regularly and want a reliable way to keep their best
+          versions organized. Instead of copying prompts into scattered notes or searching old chats, you can store them
+          once and retrieve them in seconds.
+        </p>
+        <div class="split">
+          <div>
+            <ul class="list">
+              <li><strong>Save prompts</strong> with optional title, tags, and source.</li>
+              <li><strong>Search by meaning</strong> (semantic search) to find relevant prompts even if you don’t remember the exact words.</li>
+              <li><strong>Keep it personal</strong> with per-user storage so your library stays separated and organized.</li>
+              <li><strong>Reuse confidently</strong> by maintaining a single, consistent prompt library over time.</li>
+            </ul>
+            <p class="fineprint">
+              This site is informational and used for store submission requirements. Your actual app experience depends
+              on the connected service configuration.
+            </p>
+          </div>
+          <div class="kpis" aria-label="Key benefits">
+            <div class="kpi">
+              <div class="value">Faster reuse</div>
+              <div class="label">Stop reinventing prompts you already refined.</div>
+            </div>
+            <div class="kpi">
+              <div class="value">Better recall</div>
+              <div class="label">Find prompts by intent, not exact wording.</div>
+            </div>
+            <div class="kpi">
+              <div class="value">Cleaner workflow</div>
+              <div class="label">Tags and metadata keep your library navigable.</div>
+            </div>
+            <div class="kpi">
+              <div class="value">Built to scale</div>
+              <div class="label">Designed for growing prompt collections.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>How It Works</h2>
+        <ul class="list">
+          <li><strong>Add prompts</strong> you want to keep and reuse.</li>
+          <li><strong>Enrich with metadata</strong> like tags and a title for quick browsing.</li>
+          <li><strong>Search when you need it</strong> using natural-language queries.</li>
+          <li><strong>Iterate</strong> by updating or replacing prompts as you improve them.</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>Support</h2>
+        <p>Support page: <a href="./support.html">Coming soon</a></p>
+        <p>Email: <a href="mailto:support@example.com">support@example.com</a></p>
+        <p class="hint">Replace with your real support email before submitting.</p>
+      </section>
+
+      <section class="grid" aria-label="Important links">
+        <a class="tile" href="./privacy.html">
+          <div class="tile-title">Privacy Policy</div>
+          <div class="tile-subtitle">Read how data is handled</div>
+        </a>
+        <a class="tile" href="./support.html">
+          <div class="tile-title">Customer Support</div>
+          <div class="tile-subtitle">Status and support contact</div>
+        </a>
+        <a class="tile" href="./terms.html">
+          <div class="tile-title">Terms of Service</div>
+          <div class="tile-subtitle">Usage terms and limitations</div>
+        </a>
+        <a class="tile" href="./demo.html">
+          <div class="tile-title">Demo Recording</div>
+          <div class="tile-subtitle">Watch the product demo</div>
+        </a>
+      </section>
+
+      <footer class="footer">
+        <p>© <span id="year"></span> Prompt Bank</p>
+      </footer>
+    </main>
+
+    <script>
+      document.getElementById("year").textContent = String(new Date().getFullYear());
+    </script>
+  </body>
+</html>
