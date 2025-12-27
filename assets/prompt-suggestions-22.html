@@ -7,15 +7,22 @@
     <style>/* main.css */
 :root {
   color-scheme: light;
-  background: #f5f7fb;
   color: #0f172a;
   font-family:
-    "Inter",
     system-ui,
     -apple-system,
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
+  --surface: rgba(255, 255, 255, 0.98);
+  --surface-2: rgba(255, 255, 255, 0.92);
+  --border: rgba(15, 23, 42, 0.12);
+  --muted: rgba(15, 23, 42, 0.62);
+  --shadow: rgba(15, 23, 42, 0.06);
+  --blue: #2563eb;
+  --blue-soft: rgba(37, 99, 235, 0.12);
+  --red: #dc2626;
+  --red-soft: rgba(220, 38, 38, 0.10);
 }
 *,
 *::before,
@@ -24,143 +31,114 @@
 }
 body {
   margin: 0;
-  min-height: 100vh;
-  background:
-    radial-gradient(
-      circle at 20% 20%,
-      #e7eeff,
-      transparent 30%),
-    radial-gradient(
-      circle at 80% 10%,
-      #f3e8ff,
-      transparent 25%),
-    radial-gradient(
-      circle at 50% 80%,
-      #e0f7ff,
-      transparent 35%),
-    #f8fafc;
+  background: transparent;
 }
 #root {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 12px 10px 16px;
+  padding: 8px;
 }
 .prompt-list {
-  width: 760px;
-  max-width: 100%;
-  margin: 0 auto;
-  padding: 12px 12px 14px;
+  width: 100%;
+  margin: 0;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  background: rgba(255, 255, 255, 0.85);
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
-  backdrop-filter: blur(8px);
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px var(--shadow);
 }
 .prompt-header {
-  font-weight: 700;
-  color: #0f172a;
-  font-size: 15px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  font-weight: 700;
+  font-size: 14px;
 }
-.copied-pill {
+.status-pill {
   padding: 4px 8px;
   border-radius: 999px;
-  background: #ecfdf3;
-  color: #166534;
+  background: rgba(16, 185, 129, 0.10);
+  color: rgba(6, 95, 70, 1);
   font-size: 11px;
   font-weight: 700;
-  border: 1px solid #bbf7d0;
+  border: 1px solid rgba(16, 185, 129, 0.25);
 }
 .prompt-scroll {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: min(520px, calc(100vh - 140px));
-  overflow-y: auto;
-  padding-right: 4px;
+  overflow: visible;
 }
 .prompt-empty {
-  padding: 18px 14px;
-  border: 1px dashed #cbd5e1;
+  padding: 14px 12px;
+  border: 1px dashed rgba(15, 23, 42, 0.22);
   border-radius: 12px;
-  background: rgba(248, 250, 252, 0.7);
-  color: #475569;
-  font-weight: 700;
+  background: rgba(15, 23, 42, 0.03);
+  color: var(--muted);
+  font-weight: 650;
   font-size: 13px;
   text-align: center;
 }
 .prompt-card {
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 14px 16px;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
-  backdrop-filter: blur(6px);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  padding: 12px;
+  background: var(--surface-2);
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  border-radius: 14px;
+  align-items: start;
 }
 .prompt-row {
-  padding: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 .prompt-row-main {
-  flex: 1;
-  display: flex;
-  border: 0;
-  background: transparent;
-  padding: 0;
+  min-width: 0;
+}
+.prompt-content {
+  padding: 10px 12px;
   border-radius: 12px;
-  min-height: 76px;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  background: rgba(255, 255, 255, 0.78);
 }
 .prompt-edit {
+  display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 14px 16px;
-}
-.prompt-row-content {
-  flex: 1;
-  border: 0;
-  background: transparent;
-  padding: 14px 16px;
-  text-align: left;
 }
 .prompt-row-actions {
   display: flex;
-  align-items: flex-end;
-  padding: 0 16px 12px 16px;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  align-self: start;
 }
 .prompt-edit-input {
   width: 100%;
   resize: vertical;
-  min-height: 84px;
-  border: 1px solid #cbd5e1;
-  border-radius: 10px;
+  min-height: 96px;
+  border: 1px solid rgba(15, 23, 42, 0.18);
+  border-radius: 12px;
   padding: 10px 12px;
   font-size: 14px;
   line-height: 1.4;
   font-family: inherit;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.95);
 }
 .prompt-edit-actions {
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
 }
 .edit-save-button {
-  border: 1px solid #93c5fd;
-  background: #eff6ff;
+  border: 1px solid rgba(37, 99, 235, 0.28);
+  background: var(--blue-soft);
   color: #1e3a8a;
-  font-weight: 800;
+  font-weight: 750;
   font-size: 12px;
   padding: 8px 12px;
   border-radius: 10px;
@@ -171,8 +149,8 @@ body {
   cursor: not-allowed;
 }
 .edit-cancel-button {
-  border: 1px solid #cbd5e1;
-  background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.18);
+  background: rgba(255, 255, 255, 0.75);
   color: #0f172a;
   font-weight: 700;
   font-size: 12px;
@@ -181,67 +159,60 @@ body {
   cursor: pointer;
 }
 .icon-button {
-  border-radius: 10px;
-  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 12px;
+  font-weight: 750;
   font-size: 12px;
-  padding: 8px 12px;
+  line-height: 1;
+  white-space: nowrap;
   cursor: pointer;
-  margin: 14px 0;
   transition:
-    transform 120ms ease,
-    box-shadow 120ms ease,
     background 120ms ease,
+    border-color 120ms ease,
     opacity 120ms ease;
 }
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn-icon svg {
+  display: block;
+}
+.btn-label {
+  display: inline-block;
+}
 .edit-button {
-  border: 1px solid #bfdbfe;
-  background: #eff6ff;
+  border: 1px solid rgba(37, 99, 235, 0.28);
+  background: rgba(255, 255, 255, 0.75);
   color: #1e3a8a;
-  margin-right: 8px;
 }
 .edit-button:hover {
-  background: #dbeafe;
-  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.12);
-}
-.prompt-row-main:hover {
-  background: rgba(248, 250, 252, 0.7);
+  background: rgba(37, 99, 235, 0.08);
 }
 .delete-button {
-  border: 1px solid #fecaca;
-  background: #fff1f2;
+  border: 1px solid rgba(220, 38, 38, 0.25);
+  background: rgba(255, 255, 255, 0.75);
   color: #991b1b;
-  margin-right: 16px;
 }
 .delete-button:hover {
-  background: #ffe4e6;
-  box-shadow: 0 6px 18px rgba(225, 29, 72, 0.14);
-}
-.icon-button:active {
-  transform: translateY(1px);
-  box-shadow: none;
+  background: var(--red-soft);
 }
 .icon-button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
-.prompt-clickable {
-  border: 1px solid #e2e8f0;
-  cursor: pointer;
-  transition:
-    transform 120ms ease,
-    box-shadow 120ms ease,
-    border-color 120ms ease,
-    background 120ms ease;
-  text-align: left;
-}
-.prompt-clickable:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
-  border-color: #cbd5e1;
-}
-.prompt-clickable:active {
-  transform: translateY(0);
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+.icon-button:focus-visible,
+.edit-save-button:focus-visible,
+.edit-cancel-button:focus-visible,
+.show-more-button:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.45);
+  outline-offset: 2px;
 }
 .skeleton {
   position: relative;
@@ -278,40 +249,49 @@ body {
 .prompt-text {
   margin: 0;
   white-space: pre-wrap;
-  flex: 1;
   line-height: 1.45;
   font-size: 14px;
 }
 .prompt-text.is-collapsed {
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 4;
   overflow: hidden;
 }
-.prompt-text.is-expanded {
-  display: block;
-}
-.copy-button {
-  border: 1px solid #cbd5e1;
-  background: #f8fafc;
+.show-more-button {
+  align-self: flex-start;
+  border: 1px solid rgba(15, 23, 42, 0.18);
+  background: rgba(255, 255, 255, 0.75);
   color: #0f172a;
-  font-weight: 600;
+  font-weight: 650;
   font-size: 12px;
-  padding: 8px 12px;
+  padding: 8px 10px;
   border-radius: 10px;
   cursor: pointer;
-  transition:
-    transform 120ms ease,
-    box-shadow 120ms ease,
-    background 120ms ease;
+  transition: background 120ms ease, border-color 120ms ease;
 }
-.copy-button:hover {
-  background: #eef2ff;
-  box-shadow: 0 6px 18px rgba(79, 70, 229, 0.18);
+.show-more-button:hover {
+  background: rgba(15, 23, 42, 0.04);
+  border-color: rgba(15, 23, 42, 0.22);
 }
-.copy-button:active {
-  transform: translateY(1px);
-  box-shadow: none;
+@media (max-width: 560px) {
+  .prompt-card {
+    grid-template-columns: 1fr 1fr;
+  }
+  .prompt-row-main {
+    grid-column: 1 / 3;
+  }
+  .prompt-row-actions {
+    grid-column: 1 / 3;
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+  .btn-label {
+    display: none;
+  }
+  .icon-button {
+    padding: 0 10px;
+  }
 }
 /*# sourceMappingURL=component.css.map */
 </style>
@@ -24815,11 +24795,12 @@ var import_react = __toESM(require_react());
 var import_jsx_runtime = __toESM(require_jsx_runtime());
 function PromptSuggestion({ prompts, matches }) {
   const containerRef = (0, import_react.useRef)(null);
-  const [copyStatus, setCopyStatus] = (0, import_react.useState)(null);
+  const [statusMessage, setStatusMessage] = (0, import_react.useState)(null);
   const [deletedKeys, setDeletedKeys] = (0, import_react.useState)(() => /* @__PURE__ */ new Set());
   const [editingKey, setEditingKey] = (0, import_react.useState)(null);
   const [draftText, setDraftText] = (0, import_react.useState)("");
   const [savingKey, setSavingKey] = (0, import_react.useState)(null);
+  const [showAll, setShowAll] = (0, import_react.useState)(false);
   const [items, setItems] = (0, import_react.useState)(() => {
     var _a;
     const derived = (_a = matches == null ? void 0 : matches.map((m) => {
@@ -24873,25 +24854,7 @@ function PromptSuggestion({ prompts, matches }) {
       const nextHeight = el.offsetHeight + 12;
       void window.openai.notifyIntrinsicHeight(nextHeight);
     }
-  }, [prompts, matches, items.length]);
-  const handleCopy = async (prompt) => {
-    var _a;
-    console.log("Prompt clicked:", prompt);
-    try {
-      if (typeof navigator !== "undefined" && ((_a = navigator.clipboard) == null ? void 0 : _a.writeText)) {
-        await navigator.clipboard.writeText(prompt);
-        setCopyStatus("Copied");
-        setTimeout(() => setCopyStatus(null), 1500);
-      } else {
-        setCopyStatus("Copy blocked");
-        setTimeout(() => setCopyStatus(null), 2e3);
-      }
-    } catch (error) {
-      console.error("Clipboard copy failed", error);
-      setCopyStatus("Copy blocked");
-      setTimeout(() => setCopyStatus(null), 2e3);
-    }
-  };
+  }, [prompts, matches, items.length, editingKey, statusMessage, showAll]);
   const startEdit = (key) => {
     if (savingKey) return;
     if (editingKey === key) {
@@ -24916,8 +24879,8 @@ function PromptSuggestion({ prompts, matches }) {
     try {
       if (!((_a = window.openai) == null ? void 0 : _a.callTool)) {
         console.warn("openai.callTool is not available in this environment");
-        setCopyStatus("Edit blocked");
-        setTimeout(() => setCopyStatus(null), 2e3);
+        setStatusMessage("Edit blocked");
+        setTimeout(() => setStatusMessage(null), 2e3);
         return;
       }
       const result = await window.openai.callTool("updatePrompt", { key, text: draftText });
@@ -24933,12 +24896,12 @@ function PromptSuggestion({ prompts, matches }) {
       );
       setEditingKey(null);
       setDraftText("");
-      setCopyStatus("Saved");
-      setTimeout(() => setCopyStatus(null), 1500);
+      setStatusMessage("Saved");
+      setTimeout(() => setStatusMessage(null), 1500);
     } catch (error) {
       console.error("Update failed", error);
-      setCopyStatus("Save failed");
-      setTimeout(() => setCopyStatus(null), 2e3);
+      setStatusMessage("Save failed");
+      setTimeout(() => setStatusMessage(null), 2e3);
     } finally {
       setSavingKey(null);
     }
@@ -24946,6 +24909,10 @@ function PromptSuggestion({ prompts, matches }) {
   const handleDelete = async (key) => {
     var _a;
     if (deletedKeys.has(key)) return;
+    if (typeof window !== "undefined" && typeof window.confirm === "function") {
+      const ok = window.confirm("Delete this saved prompt?");
+      if (!ok) return;
+    }
     setDeletedKeys((prev) => new Set(prev).add(key));
     try {
       if (!((_a = window.openai) == null ? void 0 : _a.callTool)) {
@@ -24958,12 +24925,12 @@ function PromptSuggestion({ prompts, matches }) {
         setEditingKey(null);
         setDraftText("");
       }
-      setCopyStatus("Deleted");
-      setTimeout(() => setCopyStatus(null), 1500);
+      setStatusMessage("Deleted");
+      setTimeout(() => setStatusMessage(null), 1500);
     } catch (error) {
       console.error("Delete failed", error);
-      setCopyStatus("Delete failed");
-      setTimeout(() => setCopyStatus(null), 2e3);
+      setStatusMessage("Delete failed");
+      setTimeout(() => setStatusMessage(null), 2e3);
     } finally {
       setDeletedKeys((prev) => {
         const next = new Set(prev);
@@ -24972,86 +24939,144 @@ function PromptSuggestion({ prompts, matches }) {
       });
     }
   };
+  const collapsedLimit = 5;
+  const hasMore = items.length > collapsedLimit;
+  const visibleItems = showAll ? items : items.slice(0, collapsedLimit);
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { ref: containerRef, className: "prompt-list", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "prompt-header", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Suggested Prompts" }),
-      copyStatus && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "copied-pill", children: copyStatus })
+      statusMessage && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "status-pill", children: statusMessage })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "prompt-scroll", children: items.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "prompt-empty", children: "No matching prompts" }) : items.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "prompt-card prompt-row", children: [
-      editingKey === item.key ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "prompt-row-main prompt-edit", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-          "textarea",
-          {
-            className: "prompt-edit-input",
-            value: draftText,
-            onChange: (e) => setDraftText(e.target.value),
-            rows: 3
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "prompt-edit-actions", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "prompt-scroll", children: [
+      items.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "prompt-empty", children: "No matching prompts" }) : visibleItems.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "prompt-card prompt-row", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "prompt-row-main", children: editingKey === item.key ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "prompt-edit", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-            "button",
+            "textarea",
             {
-              type: "button",
-              className: "edit-save-button",
-              onClick: () => void saveEdit(item.key),
-              disabled: savingKey === item.key || !draftText.trim(),
-              children: savingKey === item.key ? "Saving\u2026" : "Save"
+              className: "prompt-edit-input",
+              value: draftText,
+              onChange: (e) => setDraftText(e.target.value),
+              rows: 4
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "prompt-edit-actions", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+              "button",
+              {
+                type: "button",
+                className: "edit-save-button",
+                onClick: () => void saveEdit(item.key),
+                disabled: savingKey === item.key || !draftText.trim(),
+                children: savingKey === item.key ? "Saving\u2026" : "Save"
+              }
+            ),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+              "button",
+              {
+                type: "button",
+                className: "edit-cancel-button",
+                onClick: cancelEdit,
+                disabled: savingKey === item.key,
+                children: "Cancel"
+              }
+            )
+          ] })
+        ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "prompt-content", "aria-label": "Prompt text", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "prompt-text is-collapsed", children: item.text }) }) }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "prompt-row-actions", "aria-label": "Prompt actions", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
             "button",
             {
               type: "button",
-              className: "edit-cancel-button",
-              onClick: cancelEdit,
-              disabled: savingKey === item.key,
-              children: "Cancel"
+              className: "icon-button edit-button",
+              onClick: (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                startEdit(item.key);
+              },
+              disabled: savingKey != null || deletedKeys.has(item.key),
+              "aria-label": "Edit prompt",
+              title: "Edit",
+              children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "btn-icon", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", { viewBox: "0 0 24 24", width: "16", height: "16", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                    "path",
+                    {
+                      d: "M4 20h4l10.5-10.5a1.5 1.5 0 0 0 0-2.1L16.6 5.5a1.5 1.5 0 0 0-2.1 0L4 16v4Z",
+                      fill: "none",
+                      stroke: "currentColor",
+                      "stroke-width": "2",
+                      "stroke-linejoin": "round"
+                    }
+                  ),
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                    "path",
+                    {
+                      d: "M13.5 6.5l4 4",
+                      fill: "none",
+                      stroke: "currentColor",
+                      "stroke-width": "2",
+                      "stroke-linecap": "round"
+                    }
+                  )
+                ] }) }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "btn-label", children: "Edit" })
+              ]
+            }
+          ),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+            "button",
+            {
+              type: "button",
+              className: "icon-button delete-button",
+              onClick: (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                void handleDelete(item.key);
+              },
+              disabled: deletedKeys.has(item.key),
+              "aria-label": "Delete prompt",
+              title: "Delete",
+              children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "btn-icon", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", { viewBox: "0 0 24 24", width: "16", height: "16", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                    "path",
+                    {
+                      d: "M6 7h12",
+                      fill: "none",
+                      stroke: "currentColor",
+                      "stroke-width": "2",
+                      "stroke-linecap": "round"
+                    }
+                  ),
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                    "path",
+                    {
+                      d: "M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2",
+                      fill: "none",
+                      stroke: "currentColor",
+                      "stroke-width": "2",
+                      "stroke-linejoin": "round"
+                    }
+                  ),
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                    "path",
+                    {
+                      d: "M8 7l1 14h6l1-14",
+                      fill: "none",
+                      stroke: "currentColor",
+                      "stroke-width": "2",
+                      "stroke-linejoin": "round"
+                    }
+                  )
+                ] }) }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "btn-label", children: "Delete" })
+              ]
             }
           )
         ] })
-      ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "prompt-row-main", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-        "button",
-        {
-          type: "button",
-          onClick: () => handleCopy(item.text),
-          className: "prompt-clickable prompt-row-content",
-          children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "prompt-text is-expanded", children: item.text })
-        }
-      ) }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-        "button",
-        {
-          type: "button",
-          className: "icon-button edit-button",
-          onClick: (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            startEdit(item.key);
-          },
-          disabled: savingKey != null || deletedKeys.has(item.key),
-          "aria-label": "Edit prompt",
-          title: "Edit",
-          children: "Edit"
-        }
-      ),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-        "button",
-        {
-          type: "button",
-          className: "icon-button delete-button",
-          onClick: (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            void handleDelete(item.key);
-          },
-          disabled: deletedKeys.has(item.key),
-          "aria-label": "Delete prompt",
-          title: "Delete",
-          children: "Delete"
-        }
-      )
-    ] }, item.key)) })
+      ] }, item.key)),
+      hasMore && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "show-more-button", onClick: () => setShowAll((v) => !v), children: showAll ? "Show less" : `Show ${items.length - visibleItems.length} more` })
+    ] })
   ] });
 }
 

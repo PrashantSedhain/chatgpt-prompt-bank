@@ -35,7 +35,12 @@ function sanitizeVersion(value) {
 
 loadEnvFromServerDotEnv()
 
-const widgetVersion = sanitizeVersion(process.env.WIDGET_VERSION) ?? sanitizeVersion(Date.now()) ?? "dev"
+const widgetVersion = sanitizeVersion(process.env.WIDGET_VERSION)
+if (!widgetVersion) {
+  throw new Error(
+    `Missing WIDGET_VERSION. Set it in server/.env (export WIDGET_VERSION="23") or pass it as an env var when building.`,
+  )
+}
 const baseName = `prompt-suggestions-${widgetVersion}`
 const htmlPath = path.join(ASSETS_DIR, `${baseName}.html`)
 const legacyHtmlPath = path.join(ASSETS_DIR, "prompt-suggestions.html")
@@ -73,7 +78,13 @@ ${js}
 
 fs.mkdirSync(ASSETS_DIR, { recursive: true })
 fs.writeFileSync(htmlPath, html, "utf8")
-fs.writeFileSync(legacyHtmlPath, html, "utf8")
+if (fs.existsSync(legacyHtmlPath)) {
+  try {
+    fs.rmSync(legacyHtmlPath, { force: true })
+  } catch {
+    fs.unlinkSync(legacyHtmlPath)
+  }
+}
 
 console.log(`Wrote widget HTML to ${htmlPath}`)
-console.log(`Wrote widget HTML to ${legacyHtmlPath}`)
+console.log(`Removed legacy widget HTML alias at ${legacyHtmlPath}`)

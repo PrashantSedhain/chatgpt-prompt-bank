@@ -5,6 +5,7 @@ import {
     type IncomingMessage,
     type ServerResponse,
 } from "node:http";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, URL } from "node:url";
@@ -521,13 +522,25 @@ function authErrorResult(message: string, error = "invalid_request") {
     } as any;
 }
 
+function normalizeWidgetUri(uri: string): string {
+    const idx = uri.indexOf("?");
+    return idx === -1 ? uri : uri.slice(0, idx);
+}
+
+function widgetTemplateUriForAsset(assetName: string): string {
+    const html = readWidgetHtml(assetName);
+    const versionHash = createHash("sha1").update(html).digest("hex").slice(0, 10);
+    return `ui://widget/${assetName}.html?v=${versionHash}`;
+}
+
+const promptWidgetAssetName = `prompt-suggestions-${WIDGET_VERSION}`;
 const promptWidget: Widget = {
     id: "fetchPrompt",
     title: "Prompt Suggestions",
-    templateUri: `ui://widget/prompt-suggestions-${WIDGET_VERSION}.html`,
+    templateUri: widgetTemplateUriForAsset(promptWidgetAssetName),
     invoking: "Gathering prompt suggestions",
     invoked: "Prompt suggestions ready",
-    assetName: `prompt-suggestions-${WIDGET_VERSION}`,
+    assetName: promptWidgetAssetName,
     responseText: "Here are prompt suggestions from PromptBank.",
 };
 
@@ -537,6 +550,7 @@ const widgetsByUri = new Map<string, Widget>();
 widgets.forEach((widget) => {
     widgetsById.set(widget.id, widget);
     widgetsByUri.set(widget.templateUri, widget);
+    widgetsByUri.set(normalizeWidgetUri(widget.templateUri), widget);
 });
 
 const fetchPromptSchema: Tool["inputSchema"] = {
@@ -830,7 +844,9 @@ function createServerInstance(authContext: AuthContext): Server {
     server.setRequestHandler(
         ReadResourceRequestSchema,
         async (request: ReadResourceRequest) => {
-            const widget = widgetsByUri.get(request.params.uri);
+            const widget =
+                widgetsByUri.get(request.params.uri) ??
+                widgetsByUri.get(normalizeWidgetUri(request.params.uri));
 
             if (!widget) {
                 throw new Error(`Resource not found: ${request.params.uri}`);
@@ -1277,12 +1293,6 @@ async function handlePostMessage(
         session.authContext.scopes = authResult.scopes;
         session.authContext.error = authResult.error;
         session.authContext.subject = authResult.subject;
-        console.log("POST auth context", {
-            authorized: session.authContext.authorized,
-            scopes: Array.from(session.authContext.scopes),
-            error: session.authContext.error,
-            subject: session.authContext.subject ?? null,
-        });
         await session.transport.handlePostMessage(req, res);
     } catch (error) {
         console.error("Failed to process message", error);

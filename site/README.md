@@ -19,5 +19,4 @@ In GitHub:
 Then push to `main` to publish.
 
 ## What to edit
-- Replace `support@example.com` across the site
-- Replace the demo link in `demo.html`
+- Replace the demo link / `VIDEO_ID` in `demo.html`
