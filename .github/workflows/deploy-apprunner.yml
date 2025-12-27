@@ -109,13 +109,13 @@ jobs:
               }
             }
           }
-JSON
+          JSON
 
           extra_args=()
           if [[ -n "${INSTANCE_ROLE_ARN:-}" ]]; then
             cat > apprunner-instance.json <<JSON
             { "InstanceRoleArn": "${INSTANCE_ROLE_ARN}" }
-JSON
+            JSON
             extra_args+=(--instance-configuration file://apprunner-instance.json)
           fi
 
