@@ -99,15 +99,15 @@ jobs:
 
           cat > apprunner-source.json <<JSON
           {
-            "AuthenticationConfiguration": { "AccessRoleArn": "${ECR_ACCESS_ROLE_ARN}" },
-            "ImageRepository": {
-              "ImageIdentifier": "${IMAGE_IDENTIFIER}",
-              "ImageRepositoryType": "ECR",
-              "ImageConfiguration": {
-                "Port": "8000",
-                "RuntimeEnvironmentVariables": { "NODE_ENV": "production" }
-              }
-            }
+          "AuthenticationConfiguration": { "AccessRoleArn": "${ECR_ACCESS_ROLE_ARN}" },
+          "ImageRepository": {
+          "ImageIdentifier": "${IMAGE_IDENTIFIER}",
+          "ImageRepositoryType": "ECR",
+          "ImageConfiguration": {
+          "Port": "8000",
+          "RuntimeEnvironmentVariables": { "NODE_ENV": "production" }
+          }
+          }
           }
           JSON
 
