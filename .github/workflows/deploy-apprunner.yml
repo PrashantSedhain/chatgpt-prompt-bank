@@ -97,25 +97,24 @@ jobs:
             exit 1
           fi
 
-          cat > apprunner-source.json <<JSON
-          {
-          "AuthenticationConfiguration": { "AccessRoleArn": "${ECR_ACCESS_ROLE_ARN}" },
-          "ImageRepository": {
-          "ImageIdentifier": "${IMAGE_IDENTIFIER}",
-          "ImageRepositoryType": "ECR",
-          "ImageConfiguration": {
-          "Port": "8000",
-          "RuntimeEnvironmentVariables": { "NODE_ENV": "production" }
-          }
-          }
-          }
-          JSON
+          jq -n \
+            --arg accessRoleArn "$ECR_ACCESS_ROLE_ARN" \
+            --arg imageIdentifier "$IMAGE_IDENTIFIER" \
+            '{
+              AuthenticationConfiguration: { AccessRoleArn: $accessRoleArn },
+              ImageRepository: {
+                ImageIdentifier: $imageIdentifier,
+                ImageRepositoryType: "ECR",
+                ImageConfiguration: {
+                  Port: "8000",
+                  RuntimeEnvironmentVariables: { NODE_ENV: "production" }
+                }
+              }
+            }' > apprunner-source.json
 
           extra_args=()
           if [[ -n "${INSTANCE_ROLE_ARN:-}" ]]; then
-            cat > apprunner-instance.json <<JSON
-            { "InstanceRoleArn": "${INSTANCE_ROLE_ARN}" }
-            JSON
+            jq -n --arg instanceRoleArn "$INSTANCE_ROLE_ARN" '{ InstanceRoleArn: $instanceRoleArn }' > apprunner-instance.json
             extra_args+=(--instance-configuration file://apprunner-instance.json)
           fi
 
