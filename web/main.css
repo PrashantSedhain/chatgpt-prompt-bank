@@ -98,10 +98,28 @@ body {
 }
 
 .prompt-content {
+  position: relative;
   padding: 10px 12px;
   border-radius: 12px;
   border: 1px solid rgba(15, 23, 42, 0.14);
   background: rgba(255, 255, 255, 0.78);
+}
+
+.prompt-expand {
+  margin-top: 8px;
+  border: none;
+  padding: 0;
+  background: transparent;
+  color: #1e3a8a;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.prompt-expand:hover {
+  color: #1d4ed8;
 }
 
 .prompt-edit {
@@ -117,6 +135,63 @@ body {
   align-items: center;
   justify-content: flex-end;
   align-self: start;
+}
+
+.prompt-actions {
+  position: relative;
+}
+
+.menu-button {
+  width: 36px;
+  padding: 0;
+  border-radius: 12px;
+}
+
+.action-menu {
+  position: absolute;
+  top: 40px;
+  right: 0;
+  width: 168px;
+  padding: 6px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+  z-index: 10;
+}
+
+.menu-item {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 0 10px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.menu-item:hover {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.menu-item:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.menu-item.danger {
+  color: #991b1b;
+}
+
+.menu-item.danger:hover {
+  background: rgba(220, 38, 38, 0.10);
 }
 
 .prompt-edit-input {
@@ -196,24 +271,15 @@ body {
   display: inline-block;
 }
 
-.edit-button {
-  border: 1px solid rgba(37, 99, 235, 0.28);
-  background: rgba(255, 255, 255, 0.75);
-  color: #1e3a8a;
+.menu-button {
+  border: 1px solid rgba(15, 23, 42, 0.16);
+  background: rgba(255, 255, 255, 0.80);
+  color: rgba(15, 23, 42, 0.80);
 }
 
-.edit-button:hover {
-  background: rgba(37, 99, 235, 0.08);
-}
-
-.delete-button {
-  border: 1px solid rgba(220, 38, 38, 0.25);
-  background: rgba(255, 255, 255, 0.75);
-  color: #991b1b;
-}
-
-.delete-button:hover {
-  background: var(--red-soft);
+.menu-button:hover {
+  background: rgba(15, 23, 42, 0.04);
+  color: rgba(15, 23, 42, 0.92);
 }
 
 .icon-button:disabled {
@@ -305,10 +371,9 @@ body {
     flex-direction: row;
     justify-content: flex-end;
   }
-  .btn-label {
-    display: none;
-  }
-  .icon-button {
-    padding: 0 10px;
+  .action-menu {
+    width: 100%;
+    left: 0;
+    right: 0;
   }
 }

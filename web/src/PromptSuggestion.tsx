@@ -17,6 +17,8 @@ export function PromptSuggestion({ prompts, matches }: PromptSuggestionProps) {
   const [draftText, setDraftText] = useState("")
   const [savingKey, setSavingKey] = useState<string | null>(null)
   const [showAll, setShowAll] = useState(false)
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() => new Set())
+  const [openMenuKey, setOpenMenuKey] = useState<string | null>(null)
   const [items, setItems] = useState(() => {
     const derived =
       matches?.map((m) => ({
@@ -53,13 +55,24 @@ export function PromptSuggestion({ prompts, matches }: PromptSuggestionProps) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return
+      if (openMenuKey) {
+        setOpenMenuKey(null)
+        return
+      }
       if (!editingKey || savingKey) return
       setEditingKey(null)
       setDraftText("")
     }
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [editingKey, savingKey])
+  }, [editingKey, savingKey, openMenuKey])
+
+  useEffect(() => {
+    if (!openMenuKey) return
+    const onWindowPointerDown = () => setOpenMenuKey(null)
+    window.addEventListener("pointerdown", onWindowPointerDown)
+    return () => window.removeEventListener("pointerdown", onWindowPointerDown)
+  }, [openMenuKey])
 
   useEffect(() => {
     const el = containerRef.current
@@ -67,7 +80,7 @@ export function PromptSuggestion({ prompts, matches }: PromptSuggestionProps) {
       const nextHeight = el.offsetHeight + 12
       void window.openai.notifyIntrinsicHeight(nextHeight)
     }
-  }, [prompts, matches, items.length, editingKey, statusMessage, showAll])
+  }, [prompts, matches, items.length, editingKey, statusMessage, showAll, expandedKeys.size, openMenuKey])
 
   const startEdit = (key: string) => {
     if (savingKey) return
@@ -163,6 +176,15 @@ export function PromptSuggestion({ prompts, matches }: PromptSuggestionProps) {
   const hasMore = items.length > collapsedLimit
   const visibleItems = showAll ? items : items.slice(0, collapsedLimit)
 
+  const toggleExpanded = (key: string) => {
+    setExpandedKeys((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
   return (
     <div ref={containerRef} className="prompt-list">
       <div className="prompt-header">
@@ -205,83 +227,132 @@ export function PromptSuggestion({ prompts, matches }: PromptSuggestionProps) {
                   </div>
                 ) : (
                   <div className="prompt-content" aria-label="Prompt text">
-                    <p className="prompt-text is-collapsed">{item.text}</p>
+                    <p className={`prompt-text ${expandedKeys.has(item.key) ? "" : "is-collapsed"}`}>{item.text}</p>
+                    {(item.text.length > 180 || item.text.split(/\r?\n/g).length > 4) && (
+                      <button
+                        type="button"
+                        className="prompt-expand"
+                        onClick={() => toggleExpanded(item.key)}
+                        aria-expanded={expandedKeys.has(item.key)}
+                      >
+                        {expandedKeys.has(item.key) ? "Show less" : "Read more"}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
 
               <div className="prompt-row-actions" aria-label="Prompt actions">
-                <button
-                  type="button"
-                  className="icon-button edit-button"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    startEdit(item.key)
-                  }}
-                  disabled={savingKey != null || deletedKeys.has(item.key)}
-                  aria-label="Edit prompt"
-                  title="Edit"
-                >
-                  <span className="btn-icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" width="16" height="16">
-                      <path
-                        d="M4 20h4l10.5-10.5a1.5 1.5 0 0 0 0-2.1L16.6 5.5a1.5 1.5 0 0 0-2.1 0L4 16v4Z"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linejoin="round"
-                      />
-                      <path
-                        d="M13.5 6.5l4 4"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                      />
-                    </svg>
-                  </span>
-                  <span className="btn-label">Edit</span>
-                </button>
-                <button
-                  type="button"
-                  className="icon-button delete-button"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    void handleDelete(item.key)
-                  }}
-                  disabled={deletedKeys.has(item.key)}
-                  aria-label="Delete prompt"
-                  title="Delete"
-                >
-                  <span className="btn-icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" width="16" height="16">
-                      <path
-                        d="M6 7h12"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                      />
-                      <path
-                        d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linejoin="round"
-                      />
-                      <path
-                        d="M8 7l1 14h6l1-14"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linejoin="round"
-                      />
-                    </svg>
-                  </span>
-                  <span className="btn-label">Delete</span>
-                </button>
+                {editingKey !== item.key && (
+                  <div
+                    className="prompt-actions"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      className="icon-button menu-button"
+                      onClick={() => setOpenMenuKey((prev) => (prev === item.key ? null : item.key))}
+                      aria-haspopup="menu"
+                      aria-expanded={openMenuKey === item.key}
+                      aria-label="Prompt actions"
+                      title="Actions"
+                      disabled={savingKey != null || deletedKeys.has(item.key)}
+                    >
+                      <span className="btn-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="18" height="18">
+                          <path
+                            d="M5 12a1.5 1.5 0 1 0 0.001 0Z"
+                            fill="currentColor"
+                            stroke="none"
+                          />
+                          <path
+                            d="M12 12a1.5 1.5 0 1 0 0.001 0Z"
+                            fill="currentColor"
+                            stroke="none"
+                          />
+                          <path
+                            d="M19 12a1.5 1.5 0 1 0 0.001 0Z"
+                            fill="currentColor"
+                            stroke="none"
+                          />
+                        </svg>
+                      </span>
+                    </button>
+
+                    {openMenuKey === item.key && (
+                      <div className="action-menu" role="menu" aria-label="Prompt actions menu">
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="menu-item"
+                          onClick={() => {
+                            setOpenMenuKey(null)
+                            startEdit(item.key)
+                          }}
+                          disabled={savingKey != null || deletedKeys.has(item.key)}
+                        >
+                          <span className="btn-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" width="16" height="16">
+                              <path
+                                d="M4 20h4l10.5-10.5a1.5 1.5 0 0 0 0-2.1L16.6 5.5a1.5 1.5 0 0 0-2.1 0L4 16v4Z"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linejoin="round"
+                              />
+                              <path
+                                d="M13.5 6.5l4 4"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                              />
+                            </svg>
+                          </span>
+                          <span className="btn-label">Edit</span>
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="menu-item danger"
+                          onClick={() => {
+                            setOpenMenuKey(null)
+                            void handleDelete(item.key)
+                          }}
+                          disabled={deletedKeys.has(item.key)}
+                        >
+                          <span className="btn-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" width="16" height="16">
+                              <path
+                                d="M6 7h12"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                              />
+                              <path
+                                d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linejoin="round"
+                              />
+                              <path
+                                d="M8 7l1 14h6l1-14"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linejoin="round"
+                              />
+                            </svg>
+                          </span>
+                          <span className="btn-label">Delete</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ))
