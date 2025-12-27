@@ -38,7 +38,7 @@ const ASSETS_DIR = path.resolve(ROOT_DIR, "assets");
 const MCP_BASE_URL = process.env.MCP_BASE_URL ?? "https://640b66a36f4c.ngrok-free.app";
 const AUTH0_ISSUER = process.env.AUTH0_ISSUER ?? "";
 const AUTH0_AUDIENCE = process.env.AUTH0_AUDIENCE ?? "";
-const AUTH0_SCOPES = process.env.AUTH0_SCOPES ?? "prompts:read prompts:write";
+const AUTH0_SCOPES = process.env.AUTH0_SCOPES ?? "";
 const WIDGET_VERSION_RAW = process.env.WIDGET_VERSION ?? "19";
 const WIDGET_VERSION = WIDGET_VERSION_RAW.trim().replace(/[^a-zA-Z0-9_-]/g, "") || "19";
 
