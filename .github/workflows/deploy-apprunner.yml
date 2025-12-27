@@ -28,6 +28,7 @@ jobs:
       SERVICE_NAME: chatgpt-prompt-bank
       ECR_REPOSITORY: chatgpt-prompt-bank
       IMAGE_TAG: ${{ github.sha }}
+      IMAGE_TAG_LATEST: ${{ secrets.IMAGE_TAG_LATEST || 'latest' }}
 
     steps:
       - name: Checkout
@@ -74,54 +75,12 @@ jobs:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           REPOSITORY: ${{ steps.cfg.outputs.ecr_repository }}
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
+          IMAGE_TAG_LATEST: ${{ env.IMAGE_TAG_LATEST }}
         run: |
           set -euo pipefail
-          docker build -t "$REGISTRY/$REPOSITORY:$IMAGE_TAG" .
+          docker build -t "$REGISTRY/$REPOSITORY:$IMAGE_TAG" -t "$REGISTRY/$REPOSITORY:$IMAGE_TAG_LATEST" .
           docker push "$REGISTRY/$REPOSITORY:$IMAGE_TAG"
-          echo "image=$REGISTRY/$REPOSITORY:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+          docker push "$REGISTRY/$REPOSITORY:$IMAGE_TAG_LATEST"
 
-      - name: Create or update App Runner service
-        shell: bash
-        env:
-          AWS_REGION: ${{ steps.cfg.outputs.aws_region }}
-          SERVICE_NAME: ${{ steps.cfg.outputs.service_name }}
-          IMAGE_IDENTIFIER: ${{ steps.login-ecr.outputs.registry }}/${{ steps.cfg.outputs.ecr_repository }}:${{ env.IMAGE_TAG }}
-          SERVICE_ARN: ${{ secrets.APPRUNNER_SERVICE_ARN }}
-          ECR_ACCESS_ROLE_ARN: ${{ secrets.APPRUNNER_ECR_ACCESS_ROLE_ARN }}
-          INSTANCE_ROLE_ARN: ${{ secrets.APPRUNNER_INSTANCE_ROLE_ARN }}
-        run: |
-          set -euo pipefail
-
-          if [[ -z "${ECR_ACCESS_ROLE_ARN:-}" ]]; then
-            echo "Missing required secret: APPRUNNER_ECR_ACCESS_ROLE_ARN"
-            exit 1
-          fi
-
-          jq -n \
-            --arg accessRoleArn "$ECR_ACCESS_ROLE_ARN" \
-            --arg imageIdentifier "$IMAGE_IDENTIFIER" \
-            '{
-              AuthenticationConfiguration: { AccessRoleArn: $accessRoleArn },
-              ImageRepository: {
-                ImageIdentifier: $imageIdentifier,
-                ImageRepositoryType: "ECR",
-                ImageConfiguration: {
-                  Port: "8000",
-                  RuntimeEnvironmentVariables: { NODE_ENV: "production" }
-                }
-              }
-            }' > apprunner-source.json
-
-          extra_args=()
-          if [[ -n "${INSTANCE_ROLE_ARN:-}" ]]; then
-            jq -n --arg instanceRoleArn "$INSTANCE_ROLE_ARN" '{ InstanceRoleArn: $instanceRoleArn }' > apprunner-instance.json
-            extra_args+=(--instance-configuration file://apprunner-instance.json)
-          fi
-
-          if [[ -n "${SERVICE_ARN:-}" ]]; then
-            echo "Updating App Runner service: $SERVICE_ARN"
-            aws apprunner update-service --region "$AWS_REGION" --service-arn "$SERVICE_ARN" --source-configuration file://apprunner-source.json "${extra_args[@]}"
-          else
-            echo "Creating App Runner service: $SERVICE_NAME"
-            aws apprunner create-service --region "$AWS_REGION" --service-name "$SERVICE_NAME" --source-configuration file://apprunner-source.json "${extra_args[@]}"
-          fi
+          echo "pushed_image_sha=$REGISTRY/$REPOSITORY:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+          echo "pushed_image_latest=$REGISTRY/$REPOSITORY:$IMAGE_TAG_LATEST" >> "$GITHUB_OUTPUT"

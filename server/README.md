@@ -56,14 +56,12 @@ Workflow file: `.github/workflows/deploy-apprunner.yml`
 
 ### Required GitHub secrets
 - `AWS_ROLE_TO_ASSUME` (GitHub OIDC role used by the workflow)
-- `APPRUNNER_ECR_ACCESS_ROLE_ARN` (role App Runner uses to pull from ECR)
 
 Optional overrides:
 - `AWS_REGION` (default `us-east-1`)
 - `APPRUNNER_SERVICE_NAME` (default `chatgpt-prompt-bank`)
 - `ECR_REPOSITORY` (default `chatgpt-prompt-bank`)
-- `APPRUNNER_SERVICE_ARN` (if set, workflow updates an existing service; otherwise it creates a new one)
-- `APPRUNNER_INSTANCE_ROLE_ARN` (if set, attached to the service so the app can call AWS APIs at runtime)
+- `IMAGE_TAG_LATEST` is pushed as `latest` on every deploy; configure App Runner to track the `latest` tag for automatic deployments.
 
 IAM policy reference: `docs/apprunner-instance-role.md`
 
