@@ -39,6 +39,7 @@ const MCP_BASE_URL = process.env.MCP_BASE_URL ?? "https://640b66a36f4c.ngrok-fre
 const AUTH0_ISSUER = process.env.AUTH0_ISSUER ?? "";
 const AUTH0_AUDIENCE = process.env.AUTH0_AUDIENCE ?? "";
 const AUTH0_SCOPES = process.env.AUTH0_SCOPES ?? "";
+const OPENAI_APPS_CHALLENGE_TOKEN = process.env.OPENAI_APPS_CHALLENGE_TOKEN ?? "";
 const WIDGET_VERSION_RAW = process.env.WIDGET_VERSION ?? "19";
 const WIDGET_VERSION = WIDGET_VERSION_RAW.trim().replace(/[^a-zA-Z0-9_-]/g, "") || "19";
 
@@ -1362,6 +1363,15 @@ const httpServer = createServer(
 
         const url = new URL(req.url, `http://${req.headers.host ?? "localhost"}`);
         console.log(`[${req.method}] ${url.pathname}${url.search}`);
+
+        if (req.method === "GET" && url.pathname === "/.well-known/openai-apps-challenge") {
+            if (!OPENAI_APPS_CHALLENGE_TOKEN.trim()) {
+                res.writeHead(404).end("Not Found");
+                return;
+            }
+            res.writeHead(200, { "Content-Type": "text/plain", "Cache-Control": "no-store" }).end(OPENAI_APPS_CHALLENGE_TOKEN);
+            return;
+        }
 
         if (req.method === "GET" && url.pathname === "/health") {
             res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify({ ok: true }));
