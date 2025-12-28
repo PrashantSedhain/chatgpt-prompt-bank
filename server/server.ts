@@ -418,6 +418,17 @@ function widgetDescriptorMeta(widget: Widget) {
     } as const;
 }
 
+function widgetCspMeta() {
+    return {
+        "openai/widgetCSP": {
+            connect_domains: [parsedBaseUrl.origin],
+            resource_domains: [],
+            redirect_domains: [],
+            frame_domains: [],
+        },
+    } as const;
+}
+
 function widgetInvocationMeta(widget: Widget) {
     return {
         "openai/toolInvocation/invoking": widget.invoking,
@@ -795,7 +806,7 @@ const resources: Resource[] = widgets.map((widget) => ({
     name: widget.title,
     description: `${widget.title} widget markup`,
     mimeType: "text/html+skybridge",
-    _meta: widgetDescriptorMeta(widget),
+    _meta: { ...widgetDescriptorMeta(widget), ...widgetCspMeta() },
 }));
 
 const resourceTemplates: ResourceTemplate[] = widgets.map((widget) => ({
@@ -803,7 +814,7 @@ const resourceTemplates: ResourceTemplate[] = widgets.map((widget) => ({
     name: widget.title,
     description: `${widget.title} widget markup`,
     mimeType: "text/html+skybridge",
-    _meta: widgetDescriptorMeta(widget),
+    _meta: { ...widgetDescriptorMeta(widget), ...widgetCspMeta() },
 }));
 
 function createServerInstance(authContext: AuthContext): Server {
@@ -858,7 +869,7 @@ function createServerInstance(authContext: AuthContext): Server {
                         uri: widget.templateUri,
                         mimeType: "text/html+skybridge",
                         text: readWidgetHtml(widget.assetName),
-                        _meta: widgetDescriptorMeta(widget),
+                        _meta: { ...widgetDescriptorMeta(widget), ...widgetCspMeta() },
                     },
                 ],
             };
