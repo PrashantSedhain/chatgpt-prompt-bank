@@ -194,6 +194,10 @@ body {
   background: rgba(220, 38, 38, 0.10);
 }
 
+.menu-item.danger .btn-label {
+  color: inherit;
+}
+
 .prompt-edit-input {
   width: 100%;
   resize: vertical;

@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react"
 
 export function PromptSuggestion({ prompts, matches }: PromptSuggestionProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const sourceSignatureRef = useRef<string | null>(null)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [deletedKeys, setDeletedKeys] = useState<Set<string>>(() => new Set())
   const [editingKey, setEditingKey] = useState<string | null>(null)
@@ -19,6 +20,7 @@ export function PromptSuggestion({ prompts, matches }: PromptSuggestionProps) {
   const [showAll, setShowAll] = useState(false)
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() => new Set())
   const [openMenuKey, setOpenMenuKey] = useState<string | null>(null)
+  const [pendingDeleteKey, setPendingDeleteKey] = useState<string | null>(null)
   const [items, setItems] = useState(() => {
     const derived =
       matches?.map((m) => ({
@@ -30,8 +32,7 @@ export function PromptSuggestion({ prompts, matches }: PromptSuggestionProps) {
     return prompts.map((prompt, index) => ({ key: `${index}`, text: prompt, preview: "" }))
   })
 
-  useEffect(() => {
-    if (editingKey || savingKey) return
+  const computeSourceSignature = () => {
     const derived =
       matches?.map((m) => ({
         key: m.key,
@@ -39,10 +40,32 @@ export function PromptSuggestion({ prompts, matches }: PromptSuggestionProps) {
         preview: m.metadata?.preview ?? "",
       })) ?? []
     if (derived.length > 0) {
-      setItems(derived)
+      return `matches:${derived.map((d) => `${d.key}:${d.text.length}:${d.preview.length}`).join("|")}`
+    }
+    return `prompts:${prompts.map((p) => `${p.length}:${p.slice(0, 24)}`).join("|")}`
+  }
+
+  useEffect(() => {
+    if (editingKey || savingKey) return
+    const signature = computeSourceSignature()
+    const previousSignature = sourceSignatureRef.current
+    if (previousSignature === null) {
+      sourceSignatureRef.current = signature
       return
     }
-    setItems(prompts.map((prompt, index) => ({ key: `${index}`, text: prompt, preview: "" })))
+    if (signature === previousSignature) return
+    sourceSignatureRef.current = signature
+    setExpandedKeys(new Set())
+    setOpenMenuKey(null)
+    setPendingDeleteKey(null)
+    const derived =
+      matches?.map((m) => ({
+        key: m.key,
+        text: m.metadata?.text ?? m.metadata?.preview ?? "",
+        preview: m.metadata?.preview ?? "",
+      })) ?? []
+    if (derived.length > 0) setItems(derived)
+    else setItems(prompts.map((prompt, index) => ({ key: `${index}`, text: prompt, preview: "" })))
   }, [prompts, matches, editingKey, savingKey])
 
   useEffect(() => {
@@ -57,6 +80,7 @@ export function PromptSuggestion({ prompts, matches }: PromptSuggestionProps) {
       if (event.key !== "Escape") return
       if (openMenuKey) {
         setOpenMenuKey(null)
+        setPendingDeleteKey(null)
         return
       }
       if (!editingKey || savingKey) return
@@ -73,6 +97,12 @@ export function PromptSuggestion({ prompts, matches }: PromptSuggestionProps) {
     window.addEventListener("pointerdown", onWindowPointerDown)
     return () => window.removeEventListener("pointerdown", onWindowPointerDown)
   }, [openMenuKey])
+
+  useEffect(() => {
+    if (openMenuKey) return
+    if (!pendingDeleteKey) return
+    setPendingDeleteKey(null)
+  }, [openMenuKey, pendingDeleteKey])
 
   useEffect(() => {
     const el = containerRef.current
@@ -141,10 +171,6 @@ export function PromptSuggestion({ prompts, matches }: PromptSuggestionProps) {
 
   const handleDelete = async (key: string) => {
     if (deletedKeys.has(key)) return
-    if (typeof window !== "undefined" && typeof window.confirm === "function") {
-      const ok = window.confirm("Delete this saved prompt?")
-      if (!ok) return
-    }
     setDeletedKeys((prev) => new Set(prev).add(key))
     try {
       if (!window.openai?.callTool) {
@@ -170,6 +196,20 @@ export function PromptSuggestion({ prompts, matches }: PromptSuggestionProps) {
         return next
       })
     }
+  }
+
+  const requestDelete = (key: string) => {
+    if (pendingDeleteKey !== key) {
+      setPendingDeleteKey(key)
+      setStatusMessage("Click Delete again to confirm")
+      setTimeout(() => {
+        setPendingDeleteKey((prev) => (prev === key ? null : prev))
+      }, 4000)
+      return
+    }
+    setPendingDeleteKey(null)
+    setOpenMenuKey(null)
+    void handleDelete(key)
   }
 
   const collapsedLimit = 5
@@ -288,6 +328,7 @@ export function PromptSuggestion({ prompts, matches }: PromptSuggestionProps) {
                           className="menu-item"
                           onClick={() => {
                             setOpenMenuKey(null)
+                            setPendingDeleteKey(null)
                             startEdit(item.key)
                           }}
                           disabled={savingKey != null || deletedKeys.has(item.key)}
@@ -317,8 +358,7 @@ export function PromptSuggestion({ prompts, matches }: PromptSuggestionProps) {
                           role="menuitem"
                           className="menu-item danger"
                           onClick={() => {
-                            setOpenMenuKey(null)
-                            void handleDelete(item.key)
+                            requestDelete(item.key)
                           }}
                           disabled={deletedKeys.has(item.key)}
                         >
@@ -347,7 +387,7 @@ export function PromptSuggestion({ prompts, matches }: PromptSuggestionProps) {
                               />
                             </svg>
                           </span>
-                          <span className="btn-label">Delete</span>
+                          <span className="btn-label">{pendingDeleteKey === item.key ? "Confirm delete" : "Delete"}</span>
                         </button>
                       </div>
                     )}

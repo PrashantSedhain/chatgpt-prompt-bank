@@ -181,6 +181,9 @@ body {
 .menu-item.danger:hover {
   background: rgba(220, 38, 38, 0.10);
 }
+.menu-item.danger .btn-label {
+  color: inherit;
+}
 .prompt-edit-input {
   width: 100%;
   resize: vertical;
@@ -24852,6 +24855,7 @@ var import_react = __toESM(require_react());
 var import_jsx_runtime = __toESM(require_jsx_runtime());
 function PromptSuggestion({ prompts, matches }) {
   const containerRef = (0, import_react.useRef)(null);
+  const sourceSignatureRef = (0, import_react.useRef)(null);
   const [statusMessage, setStatusMessage] = (0, import_react.useState)(null);
   const [deletedKeys, setDeletedKeys] = (0, import_react.useState)(() => /* @__PURE__ */ new Set());
   const [editingKey, setEditingKey] = (0, import_react.useState)(null);
@@ -24860,6 +24864,7 @@ function PromptSuggestion({ prompts, matches }) {
   const [showAll, setShowAll] = (0, import_react.useState)(false);
   const [expandedKeys, setExpandedKeys] = (0, import_react.useState)(() => /* @__PURE__ */ new Set());
   const [openMenuKey, setOpenMenuKey] = (0, import_react.useState)(null);
+  const [pendingDeleteKey, setPendingDeleteKey] = (0, import_react.useState)(null);
   const [items, setItems] = (0, import_react.useState)(() => {
     var _a;
     const derived = (_a = matches == null ? void 0 : matches.map((m) => {
@@ -24873,9 +24878,8 @@ function PromptSuggestion({ prompts, matches }) {
     if (derived.length > 0) return derived;
     return prompts.map((prompt, index) => ({ key: `${index}`, text: prompt, preview: "" }));
   });
-  (0, import_react.useEffect)(() => {
+  const computeSourceSignature = () => {
     var _a;
-    if (editingKey || savingKey) return;
     const derived = (_a = matches == null ? void 0 : matches.map((m) => {
       var _a2, _b, _c, _d, _e, _f;
       return {
@@ -24885,10 +24889,34 @@ function PromptSuggestion({ prompts, matches }) {
       };
     })) != null ? _a : [];
     if (derived.length > 0) {
-      setItems(derived);
+      return `matches:${derived.map((d) => `${d.key}:${d.text.length}:${d.preview.length}`).join("|")}`;
+    }
+    return `prompts:${prompts.map((p) => `${p.length}:${p.slice(0, 24)}`).join("|")}`;
+  };
+  (0, import_react.useEffect)(() => {
+    var _a;
+    if (editingKey || savingKey) return;
+    const signature = computeSourceSignature();
+    const previousSignature = sourceSignatureRef.current;
+    if (previousSignature === null) {
+      sourceSignatureRef.current = signature;
       return;
     }
-    setItems(prompts.map((prompt, index) => ({ key: `${index}`, text: prompt, preview: "" })));
+    if (signature === previousSignature) return;
+    sourceSignatureRef.current = signature;
+    setExpandedKeys(/* @__PURE__ */ new Set());
+    setOpenMenuKey(null);
+    setPendingDeleteKey(null);
+    const derived = (_a = matches == null ? void 0 : matches.map((m) => {
+      var _a2, _b, _c, _d, _e, _f;
+      return {
+        key: m.key,
+        text: (_d = (_c = (_a2 = m.metadata) == null ? void 0 : _a2.text) != null ? _c : (_b = m.metadata) == null ? void 0 : _b.preview) != null ? _d : "",
+        preview: (_f = (_e = m.metadata) == null ? void 0 : _e.preview) != null ? _f : ""
+      };
+    })) != null ? _a : [];
+    if (derived.length > 0) setItems(derived);
+    else setItems(prompts.map((prompt, index) => ({ key: `${index}`, text: prompt, preview: "" })));
   }, [prompts, matches, editingKey, savingKey]);
   (0, import_react.useEffect)(() => {
     if (!editingKey) return;
@@ -24901,6 +24929,7 @@ function PromptSuggestion({ prompts, matches }) {
       if (event.key !== "Escape") return;
       if (openMenuKey) {
         setOpenMenuKey(null);
+        setPendingDeleteKey(null);
         return;
       }
       if (!editingKey || savingKey) return;
@@ -24916,6 +24945,11 @@ function PromptSuggestion({ prompts, matches }) {
     window.addEventListener("pointerdown", onWindowPointerDown);
     return () => window.removeEventListener("pointerdown", onWindowPointerDown);
   }, [openMenuKey]);
+  (0, import_react.useEffect)(() => {
+    if (openMenuKey) return;
+    if (!pendingDeleteKey) return;
+    setPendingDeleteKey(null);
+  }, [openMenuKey, pendingDeleteKey]);
   (0, import_react.useEffect)(() => {
     var _a;
     const el = containerRef.current;
@@ -24978,10 +25012,6 @@ function PromptSuggestion({ prompts, matches }) {
   const handleDelete = async (key) => {
     var _a;
     if (deletedKeys.has(key)) return;
-    if (typeof window !== "undefined" && typeof window.confirm === "function") {
-      const ok = window.confirm("Delete this saved prompt?");
-      if (!ok) return;
-    }
     setDeletedKeys((prev) => new Set(prev).add(key));
     try {
       if (!((_a = window.openai) == null ? void 0 : _a.callTool)) {
@@ -25007,6 +25037,19 @@ function PromptSuggestion({ prompts, matches }) {
         return next;
       });
     }
+  };
+  const requestDelete = (key) => {
+    if (pendingDeleteKey !== key) {
+      setPendingDeleteKey(key);
+      setStatusMessage("Click Delete again to confirm");
+      setTimeout(() => {
+        setPendingDeleteKey((prev) => prev === key ? null : prev);
+      }, 4e3);
+      return;
+    }
+    setPendingDeleteKey(null);
+    setOpenMenuKey(null);
+    void handleDelete(key);
   };
   const collapsedLimit = 5;
   const hasMore = items.length > collapsedLimit;
@@ -25126,6 +25169,7 @@ function PromptSuggestion({ prompts, matches }) {
                     className: "menu-item",
                     onClick: () => {
                       setOpenMenuKey(null);
+                      setPendingDeleteKey(null);
                       startEdit(item.key);
                     },
                     disabled: savingKey != null || deletedKeys.has(item.key),
@@ -25163,8 +25207,7 @@ function PromptSuggestion({ prompts, matches }) {
                     role: "menuitem",
                     className: "menu-item danger",
                     onClick: () => {
-                      setOpenMenuKey(null);
-                      void handleDelete(item.key);
+                      requestDelete(item.key);
                     },
                     disabled: deletedKeys.has(item.key),
                     children: [
@@ -25200,7 +25243,7 @@ function PromptSuggestion({ prompts, matches }) {
                           }
                         )
                       ] }) }),
-                      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "btn-label", children: "Delete" })
+                      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "btn-label", children: pendingDeleteKey === item.key ? "Confirm delete" : "Delete" })
                     ]
                   }
                 )
