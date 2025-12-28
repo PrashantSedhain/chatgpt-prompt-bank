@@ -24868,24 +24868,26 @@ function PromptSuggestion({ prompts, matches }) {
   const [items, setItems] = (0, import_react.useState)(() => {
     var _a;
     const derived = (_a = matches == null ? void 0 : matches.map((m) => {
-      var _a2, _b, _c, _d, _e, _f;
+      var _a2, _b, _c, _d, _e, _f, _g, _h;
       return {
         key: m.key,
         text: (_d = (_c = (_a2 = m.metadata) == null ? void 0 : _a2.text) != null ? _c : (_b = m.metadata) == null ? void 0 : _b.preview) != null ? _d : "",
-        preview: (_f = (_e = m.metadata) == null ? void 0 : _e.preview) != null ? _f : ""
+        preview: (_f = (_e = m.metadata) == null ? void 0 : _e.preview) != null ? _f : "",
+        title: (_h = (_g = m.metadata) == null ? void 0 : _g.title) != null ? _h : ""
       };
     })) != null ? _a : [];
     if (derived.length > 0) return derived;
-    return prompts.map((prompt, index) => ({ key: `${index}`, text: prompt, preview: "" }));
+    return prompts.map((prompt, index) => ({ key: `${index}`, text: prompt, preview: "", title: "" }));
   });
   const computeSourceSignature = () => {
     var _a;
     const derived = (_a = matches == null ? void 0 : matches.map((m) => {
-      var _a2, _b, _c, _d, _e, _f;
+      var _a2, _b, _c, _d, _e, _f, _g, _h;
       return {
         key: m.key,
         text: (_d = (_c = (_a2 = m.metadata) == null ? void 0 : _a2.text) != null ? _c : (_b = m.metadata) == null ? void 0 : _b.preview) != null ? _d : "",
-        preview: (_f = (_e = m.metadata) == null ? void 0 : _e.preview) != null ? _f : ""
+        preview: (_f = (_e = m.metadata) == null ? void 0 : _e.preview) != null ? _f : "",
+        title: (_h = (_g = m.metadata) == null ? void 0 : _g.title) != null ? _h : ""
       };
     })) != null ? _a : [];
     if (derived.length > 0) {
@@ -24908,15 +24910,16 @@ function PromptSuggestion({ prompts, matches }) {
     setOpenMenuKey(null);
     setPendingDeleteKey(null);
     const derived = (_a = matches == null ? void 0 : matches.map((m) => {
-      var _a2, _b, _c, _d, _e, _f;
+      var _a2, _b, _c, _d, _e, _f, _g, _h;
       return {
         key: m.key,
         text: (_d = (_c = (_a2 = m.metadata) == null ? void 0 : _a2.text) != null ? _c : (_b = m.metadata) == null ? void 0 : _b.preview) != null ? _d : "",
-        preview: (_f = (_e = m.metadata) == null ? void 0 : _e.preview) != null ? _f : ""
+        preview: (_f = (_e = m.metadata) == null ? void 0 : _e.preview) != null ? _f : "",
+        title: (_h = (_g = m.metadata) == null ? void 0 : _g.title) != null ? _h : ""
       };
     })) != null ? _a : [];
     if (derived.length > 0) setItems(derived);
-    else setItems(prompts.map((prompt, index) => ({ key: `${index}`, text: prompt, preview: "" })));
+    else setItems(prompts.map((prompt, index) => ({ key: `${index}`, text: prompt, preview: "", title: "" })));
   }, [prompts, matches, editingKey, savingKey]);
   (0, import_react.useEffect)(() => {
     if (!editingKey) return;
@@ -25010,7 +25013,7 @@ function PromptSuggestion({ prompts, matches }) {
     }
   };
   const handleDelete = async (key) => {
-    var _a;
+    var _a, _b, _c, _d;
     if (deletedKeys.has(key)) return;
     setDeletedKeys((prev) => new Set(prev).add(key));
     try {
@@ -25018,8 +25021,11 @@ function PromptSuggestion({ prompts, matches }) {
         console.warn("openai.callTool is not available in this environment");
         return;
       }
-      await window.openai.callTool("deletePrompt", { key });
-      setItems((prev) => prev.filter((item) => item.key !== key));
+      const item = items.find((i) => i.key === key);
+      const preview = ((_b = item == null ? void 0 : item.preview) == null ? void 0 : _b.trim()) || ((_c = item == null ? void 0 : item.text) == null ? void 0 : _c.trim().slice(0, 160)) || "";
+      const title = ((_d = item == null ? void 0 : item.title) == null ? void 0 : _d.trim()) || "";
+      await window.openai.callTool("deletePrompt", { prompt: { key, ...title ? { title } : {}, ...preview ? { preview } : {} } });
+      setItems((prev) => prev.filter((item2) => item2.key !== key));
       if (editingKey === key) {
         setEditingKey(null);
         setDraftText("");

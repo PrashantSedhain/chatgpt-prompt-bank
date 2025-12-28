@@ -27,9 +27,10 @@ export function PromptSuggestion({ prompts, matches }: PromptSuggestionProps) {
         key: m.key,
         text: m.metadata?.text ?? m.metadata?.preview ?? "",
         preview: m.metadata?.preview ?? "",
+        title: m.metadata?.title ?? "",
       })) ?? []
     if (derived.length > 0) return derived
-    return prompts.map((prompt, index) => ({ key: `${index}`, text: prompt, preview: "" }))
+    return prompts.map((prompt, index) => ({ key: `${index}`, text: prompt, preview: "", title: "" }))
   })
 
   const computeSourceSignature = () => {
@@ -38,6 +39,7 @@ export function PromptSuggestion({ prompts, matches }: PromptSuggestionProps) {
         key: m.key,
         text: m.metadata?.text ?? m.metadata?.preview ?? "",
         preview: m.metadata?.preview ?? "",
+        title: m.metadata?.title ?? "",
       })) ?? []
     if (derived.length > 0) {
       return `matches:${derived.map((d) => `${d.key}:${d.text.length}:${d.preview.length}`).join("|")}`
@@ -63,9 +65,10 @@ export function PromptSuggestion({ prompts, matches }: PromptSuggestionProps) {
         key: m.key,
         text: m.metadata?.text ?? m.metadata?.preview ?? "",
         preview: m.metadata?.preview ?? "",
+        title: m.metadata?.title ?? "",
       })) ?? []
     if (derived.length > 0) setItems(derived)
-    else setItems(prompts.map((prompt, index) => ({ key: `${index}`, text: prompt, preview: "" })))
+    else setItems(prompts.map((prompt, index) => ({ key: `${index}`, text: prompt, preview: "", title: "" })))
   }, [prompts, matches, editingKey, savingKey])
 
   useEffect(() => {
@@ -177,7 +180,10 @@ export function PromptSuggestion({ prompts, matches }: PromptSuggestionProps) {
         console.warn("openai.callTool is not available in this environment")
         return
       }
-      await window.openai.callTool("deletePrompt", { key })
+      const item = items.find((i) => i.key === key)
+      const preview = item?.preview?.trim() || item?.text?.trim().slice(0, 160) || ""
+      const title = item?.title?.trim() || ""
+      await window.openai.callTool("deletePrompt", { prompt: { key, ...(title ? { title } : {}), ...(preview ? { preview } : {}) } })
       setItems((prev) => prev.filter((item) => item.key !== key))
       if (editingKey === key) {
         setEditingKey(null)

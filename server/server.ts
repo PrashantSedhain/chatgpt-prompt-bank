@@ -689,10 +689,21 @@ const deletePromptSchema: Tool["inputSchema"] = {
     properties: {
         key: {
             type: "string",
-            description: "Vector key of the prompt to delete.",
+            description: "Deprecated. Vector key of the prompt to delete.",
+        },
+        prompt: {
+            type: "object",
+            description: "Prompt to delete (human-friendly details included for user confirmation).",
+            properties: {
+                key: { type: "string", description: "Vector key of the prompt to delete." },
+                title: { type: "string", description: "Optional title shown to the user for confirmation." },
+                preview: { type: "string", description: "Short preview shown to the user for confirmation." },
+            },
+            required: ["key", "preview"],
+            additionalProperties: false,
         },
     },
-    required: ["key"],
+    anyOf: [{ required: ["prompt"] }, { required: ["key"] }],
     additionalProperties: false,
 };
 
@@ -766,7 +777,8 @@ const tools: Tool[] = [
     {
         name: "deletePrompt",
         title: "Delete prompt",
-        description: "Delete a saved prompt for the authenticated user.",
+        description:
+            "Delete a saved prompt for the authenticated user. Only call this after the user has explicitly confirmed which prompt to delete (show title/preview first). Always pass `prompt.preview` so the user can recognize the prompt in the confirmation UI.",
         inputSchema: deletePromptSchema,
         annotations: {
             destructiveHint: true,
@@ -1043,11 +1055,18 @@ function createServerInstance(authContext: AuthContext): Server {
 
             if (normalizedToolName === "deletePrompt") {
                 const userSub = authContext.subject!;
-                const key = typeof _request.params.arguments?.key === "string" ? _request.params.arguments.key : "";
+                const args: any = _request.params.arguments as any;
+                const argKey = typeof args?.key === "string" ? args.key : "";
+                const promptObj: any = args?.prompt;
+                const promptKey = typeof promptObj?.key === "string" ? promptObj.key : "";
+                const key = promptKey || argKey;
+                const title = typeof promptObj?.title === "string" ? promptObj.title : undefined;
+                const preview = typeof promptObj?.preview === "string" ? promptObj.preview : undefined;
+
                 if (!key.trim()) {
                     return {
                         isError: true,
-                        content: [{ type: "text", text: "Missing required input: `key`." }],
+                        content: [{ type: "text", text: "Missing required input: `prompt.key`." }],
                     } as any;
                 }
 
@@ -1060,6 +1079,8 @@ function createServerInstance(authContext: AuthContext): Server {
                             deleted: result.deleted,
                             key,
                             indexName: result.indexName,
+                            ...(title ? { title } : {}),
+                            ...(preview ? { preview } : {}),
                         },
                     } as any;
                 } catch (error) {
