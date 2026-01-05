@@ -56,6 +56,16 @@ const parsedBaseUrl = new URL(MCP_BASE_URL);
 const resourcePath = parsedBaseUrl.pathname === "/" ? "" : parsedBaseUrl.pathname;
 const protectedResourcePath = `/.well-known/oauth-protected-resource${resourcePath}`;
 const protectedResourceMetadataUrl = `${parsedBaseUrl.origin}${protectedResourcePath}`;
+const WIDGET_DOMAIN = (() => {
+    const raw = (process.env.WIDGET_DOMAIN ?? parsedBaseUrl.origin).trim();
+    try {
+        const url = new URL(raw);
+        if (url.protocol !== "https:") return parsedBaseUrl.origin;
+        return url.origin;
+    } catch {
+        return parsedBaseUrl.origin;
+    }
+})();
 
 const vectorStore = new AwsVectorStore({
     s3VectorsArn: S3VECTORS_ARN,
@@ -430,6 +440,12 @@ function widgetCspMeta() {
     } as const;
 }
 
+function widgetDomainMeta() {
+    return {
+        "openai/widgetDomain": WIDGET_DOMAIN,
+    } as const;
+}
+
 function widgetInvocationMeta(widget: Widget) {
     return {
         "openai/toolInvocation/invoking": widget.invoking,
@@ -752,6 +768,8 @@ const tools: Tool[] = [
         title: "Find saved prompts",
         _meta: {
             ...widgetDescriptorMeta(promptWidget),
+            ...widgetCspMeta(),
+            ...widgetDomainMeta(),
             securitySchemes: oauthSecuritySchemes,
         },
         annotations: {
@@ -819,7 +837,7 @@ const resources: Resource[] = widgets.map((widget) => ({
     name: widget.title,
     description: `${widget.title} widget markup`,
     mimeType: "text/html+skybridge",
-    _meta: { ...widgetDescriptorMeta(widget), ...widgetCspMeta(), "openai/widgetDomain": "https://chatgpt.com" },
+    _meta: { ...widgetDescriptorMeta(widget), ...widgetCspMeta(), ...widgetDomainMeta() },
 }));
 
 const resourceTemplates: ResourceTemplate[] = widgets.map((widget) => ({
@@ -827,7 +845,7 @@ const resourceTemplates: ResourceTemplate[] = widgets.map((widget) => ({
     name: widget.title,
     description: `${widget.title} widget markup`,
     mimeType: "text/html+skybridge",
-    _meta: { ...widgetDescriptorMeta(widget), ...widgetCspMeta() },
+    _meta: { ...widgetDescriptorMeta(widget), ...widgetCspMeta(), ...widgetDomainMeta() },
 }));
 
 function createServerInstance(authContext: AuthContext): Server {
@@ -882,7 +900,7 @@ function createServerInstance(authContext: AuthContext): Server {
                         uri: widget.templateUri,
                         mimeType: "text/html+skybridge",
                         text: readWidgetHtml(widget.assetName),
-                        _meta: { ...widgetDescriptorMeta(widget), ...widgetCspMeta() },
+                        _meta: { ...widgetDescriptorMeta(widget), ...widgetCspMeta(), ...widgetDomainMeta() },
                     },
                 ],
             };
