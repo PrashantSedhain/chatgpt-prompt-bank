@@ -819,7 +819,7 @@ const resources: Resource[] = widgets.map((widget) => ({
     name: widget.title,
     description: `${widget.title} widget markup`,
     mimeType: "text/html+skybridge",
-    _meta: { ...widgetDescriptorMeta(widget), ...widgetCspMeta() },
+    _meta: { ...widgetDescriptorMeta(widget), ...widgetCspMeta(), "openai/widgetDomain": "https://chatgpt.com" },
 }));
 
 const resourceTemplates: ResourceTemplate[] = widgets.map((widget) => ({
